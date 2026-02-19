@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import {
    Alert,
    Box,
@@ -10,7 +10,17 @@ import {
    Chip,
    CircularProgress,
    Container,
+   Dialog,
+   DialogActions,
+   DialogContent,
+   DialogTitle,
+   FormControl,
    IconButton,
+   InputLabel,
+   Menu,
+   MenuItem,
+   Select,
+   Snackbar,
    Stack,
    Tab,
    Tabs,
@@ -22,18 +32,17 @@ import {
    AutoStories,
    Category as CategoryIcon,
    Description,
-   Edit,
-   FilterList,
    MenuBook,
+   MoreVert,
    TrendingUp,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { getAdminOverview } from "@/api/analytics.api";
-import { listBooks } from "@/api/books.api";
+import { listAgeGroups } from "@/api/ageGroups.api";
+import { deleteBook, listBooks, publishBook, unpublishBook } from "@/api/books.api";
 import { listCategories } from "@/api/categories.api";
-import { get } from "@/api/client";
 import type { Book } from "@/types/book.types";
-import { API_ENDPOINTS, ROUTES } from "@/utils/constants";
+import { ROUTES } from "@/utils/constants";
 
 interface DashboardStats {
    totalBooks: number;
@@ -41,17 +50,7 @@ interface DashboardStats {
    pendingDrafts: number;
 }
 
-interface AgeGroupOption {
-   id: string;
-   name: string;
-   minAge: number;
-   maxAge: number;
-}
-
-interface AgeGroupListResponse {
-   total: number;
-   ageGroups: AgeGroupOption[];
-}
+type SnackbarSeverity = "success" | "error" | "info" | "warning";
 
 function StatCard({
    label,
@@ -128,23 +127,57 @@ export function AdminDashboard() {
    const [stats, setStats] = useState<DashboardStats | null>(null);
    const [books, setBooks] = useState<Book[]>([]);
    const [activeTab, setActiveTab] = useState(0);
-   const [loading, setLoading] = useState(true);
    const [error, setError] = useState<string | null>(null);
    const [refreshKey, setRefreshKey] = useState(0);
+
+   const [initialLoading, setInitialLoading] = useState(true);
+   const [isFetching, setIsFetching] = useState(false);
+   const firstLoadRef = useRef(true);
+
+   const [selectedAgeGroupId, setSelectedAgeGroupId] = useState("");
+   const [selectedCategoryId, setSelectedCategoryId] = useState("");
+
    const [categoryMap, setCategoryMap] = useState<Record<string, string>>({});
    const [ageGroupMap, setAgeGroupMap] = useState<Record<string, string>>({});
+
+   const [ageGroupOptions, setAgeGroupOptions] = useState<Array<{ id: string; name: string }>>([]);
+   const [categoryOptions, setCategoryOptions] = useState<Array<{ id: string; name: string }>>([]);
+
+   const [bookToDelete, setBookToDelete] = useState<Book | null>(null);
+   const [isDeleting, setIsDeleting] = useState(false);
+   const [statusUpdatingBookId, setStatusUpdatingBookId] = useState<string | null>(
+      null
+   );
+   const [bookActionsAnchor, setBookActionsAnchor] = useState<HTMLElement | null>(
+      null
+   );
+   const [bookActionsTarget, setBookActionsTarget] = useState<Book | null>(null);
+   const [bookForStatusDialog, setBookForStatusDialog] = useState<Book | null>(null);
+
+   const [snackbar, setSnackbar] = useState<{
+      open: boolean;
+      severity: SnackbarSeverity;
+      message: string;
+   }>({
+      open: false,
+      severity: "success",
+      message: "",
+   });
 
    const tabFilters = useMemo(() => ["all", "published", "draft"] as const, []);
    const currentFilter = tabFilters[activeTab];
 
    useEffect(() => {
-      const handleBookCreated = () => {
+      const handleBookChanged = () => {
          setRefreshKey((prev) => prev + 1);
       };
 
-      window.addEventListener("admin:book-created", handleBookCreated);
+      window.addEventListener("admin:book-created", handleBookChanged);
+      window.addEventListener("admin:book-updated", handleBookChanged);
+
       return () => {
-         window.removeEventListener("admin:book-created", handleBookCreated);
+         window.removeEventListener("admin:book-created", handleBookChanged);
+         window.removeEventListener("admin:book-updated", handleBookChanged);
       };
    }, []);
 
@@ -193,9 +226,16 @@ export function AdminDashboard() {
    };
 
    useEffect(() => {
+      let mounted = true;
+
       const fetchData = async () => {
          try {
-            setLoading(true);
+            if (firstLoadRef.current) {
+               setInitialLoading(true);
+            } else {
+               setIsFetching(true);
+            }
+
             setError(null);
 
             const statusFilter =
@@ -208,10 +248,16 @@ export function AdminDashboard() {
             const [analyticsData, booksData, categoriesData, ageGroupsData] =
                await Promise.all([
                   getAdminOverview(),
-                  listBooks({ status: statusFilter }),
+                  listBooks({
+                     status: statusFilter,
+                     ageGroupId: selectedAgeGroupId || undefined,
+                     categoryId: selectedCategoryId || undefined,
+                  }),
                   listCategories({ isActive: true }),
-                  get<AgeGroupListResponse>(API_ENDPOINTS.AGE_GROUPS.PUBLIC),
+                  listAgeGroups(),
                ]);
+
+            if (!mounted) return;
 
             const pendingDrafts =
                analyticsData.overview.totalBooks -
@@ -225,37 +271,151 @@ export function AdminDashboard() {
 
             setBooks(booksData.books || []);
 
-            setCategoryMap(
-               (categoriesData.categories || []).reduce(
-                  (acc, category) => {
-                     acc[category.id] = category.name;
-                     return acc;
-                  },
-                  {} as Record<string, string>
-               )
+            const nextCategoryMap = (categoriesData.categories || []).reduce(
+               (acc, category) => {
+                  acc[category.id] = category.name;
+                  return acc;
+               },
+               {} as Record<string, string>
+            );
+            setCategoryMap(nextCategoryMap);
+            setCategoryOptions(
+               Object.entries(nextCategoryMap).map(([id, name]) => ({ id, name }))
             );
 
-            setAgeGroupMap(
-               (ageGroupsData.ageGroups || []).reduce(
-                  (acc, group) => {
-                     acc[group.id] = group.name;
-                     return acc;
-                  },
-                  {} as Record<string, string>
-               )
+            const nextAgeGroupMap = (ageGroupsData.ageGroups || []).reduce(
+               (acc, group) => {
+                  acc[group.id] = group.name;
+                  return acc;
+               },
+               {} as Record<string, string>
+            );
+            setAgeGroupMap(nextAgeGroupMap);
+            setAgeGroupOptions(
+               (ageGroupsData.ageGroups || []).map((group) => ({
+                  id: group.id,
+                  name: group.name,
+               }))
             );
          } catch (err) {
+            if (!mounted) return;
             setError("Failed to load dashboard data");
             console.error(err);
          } finally {
-            setLoading(false);
+            if (mounted) {
+               setInitialLoading(false);
+               setIsFetching(false);
+               firstLoadRef.current = false;
+            }
          }
       };
 
       void fetchData();
-   }, [currentFilter, refreshKey]);
 
-   if (loading) {
+      return () => {
+         mounted = false;
+      };
+   }, [currentFilter, refreshKey, selectedAgeGroupId, selectedCategoryId]);
+
+   const handleDeleteBook = async () => {
+      if (!bookToDelete) return;
+
+      const previousBooks = books;
+      const targetId = bookToDelete.id;
+
+      setBooks((prev) => prev.filter((book) => book.id !== targetId));
+      setIsDeleting(true);
+      setBookToDelete(null);
+
+      try {
+         await deleteBook(targetId);
+         setSnackbar({
+            open: true,
+            severity: "success",
+            message: "Book deleted successfully.",
+         });
+         setRefreshKey((prev) => prev + 1);
+      } catch (err) {
+         setBooks(previousBooks);
+         setSnackbar({
+            open: true,
+            severity: "error",
+            message:
+               typeof err === "object" &&
+               err !== null &&
+               "message" in err &&
+               typeof err.message === "string"
+                  ? err.message
+                  : "Failed to delete book.",
+         });
+      } finally {
+         setIsDeleting(false);
+      }
+   };
+
+   const handleStatusChange = async (book: Book, nextStatus: "draft" | "published") => {
+      const currentStatus = (book.status || "").toLowerCase();
+      if (currentStatus === nextStatus) {
+         setBookForStatusDialog(null);
+         return;
+      }
+
+      const previousBooks = books;
+      setStatusUpdatingBookId(book.id);
+
+      setBooks((prev) =>
+         prev.map((item) =>
+            item.id === book.id ? { ...item, status: nextStatus } : item
+         )
+      );
+
+      try {
+         if (nextStatus === "published") {
+            await publishBook(book.id);
+         } else {
+            await unpublishBook(book.id);
+         }
+
+         setRefreshKey((prev) => prev + 1);
+         setSnackbar({
+            open: true,
+            severity: "success",
+            message: `Book moved to ${nextStatus}.`,
+         });
+         setBookForStatusDialog(null);
+      } catch (err) {
+         setBooks(previousBooks);
+         setSnackbar({
+            open: true,
+            severity: "error",
+            message:
+               typeof err === "object" &&
+               err !== null &&
+               "message" in err &&
+               typeof err.message === "string"
+                  ? err.message
+                  : "Failed to update book status.",
+         });
+      } finally {
+         setStatusUpdatingBookId(null);
+      }
+   };
+
+   const closeBookActionsMenu = () => {
+      setBookActionsAnchor(null);
+      setBookActionsTarget(null);
+   };
+
+   const openBookActionsMenu = (
+      event: MouseEvent<HTMLButtonElement>,
+      book: Book
+   ) => {
+      event.stopPropagation();
+      setBookActionsAnchor(event.currentTarget);
+      setBookActionsTarget(book);
+   };
+
+   if (initialLoading) {
       return (
          <Container maxWidth="xl" sx={{ py: 6 }}>
             <Box
@@ -308,21 +468,12 @@ export function AdminDashboard() {
                <StatCard
                   label="Total Books"
                   value={(stats?.totalBooks ?? 0).toLocaleString()}
-                  icon={
-                     <MenuBook
-                        sx={{ fontSize: 22, color: theme.palette.primary.main }}
-                     />
-                  }
+                  icon={<MenuBook sx={{ fontSize: 22, color: theme.palette.primary.main }} />}
                   iconBg={alpha(theme.palette.primary.main, 0.12)}
                   helper={
                      <Stack direction="row" alignItems="center" spacing={0.75}>
-                        <TrendingUp
-                           sx={{ fontSize: 16, color: "success.main" }}
-                        />
-                        <Typography
-                           variant="caption"
-                           sx={{ color: "success.main", fontWeight: 700 }}
-                        >
+                        <TrendingUp sx={{ fontSize: 16, color: "success.main" }} />
+                        <Typography variant="caption" sx={{ color: "success.main", fontWeight: 700 }}>
                            +12% from last month
                         </Typography>
                      </Stack>
@@ -332,21 +483,12 @@ export function AdminDashboard() {
                <StatCard
                   label="Total Minutes Read"
                   value={(stats?.totalMinutesRead ?? 0).toLocaleString()}
-                  icon={
-                     <AutoStories
-                        sx={{ fontSize: 22, color: theme.palette.success.main }}
-                     />
-                  }
+                  icon={<AutoStories sx={{ fontSize: 22, color: theme.palette.success.main }} />}
                   iconBg={alpha(theme.palette.success.main, 0.12)}
                   helper={
                      <Stack direction="row" alignItems="center" spacing={0.75}>
-                        <TrendingUp
-                           sx={{ fontSize: 16, color: "success.main" }}
-                        />
-                        <Typography
-                           variant="caption"
-                           sx={{ color: "success.main", fontWeight: 700 }}
-                        >
+                        <TrendingUp sx={{ fontSize: 16, color: "success.main" }} />
+                        <Typography variant="caption" sx={{ color: "success.main", fontWeight: 700 }}>
                            +5% increase
                         </Typography>
                      </Stack>
@@ -356,80 +498,107 @@ export function AdminDashboard() {
                <StatCard
                   label="Pending Drafts"
                   value={(stats?.pendingDrafts ?? 0).toLocaleString()}
-                  icon={
-                     <Description
-                        sx={{ fontSize: 22, color: theme.palette.warning.main }}
-                     />
-                  }
+                  icon={<Description sx={{ fontSize: 22, color: theme.palette.warning.main }} />}
                   iconBg={alpha(theme.palette.warning.main, 0.14)}
                   helper={
-                     <Typography
-                        variant="caption"
-                        sx={{ color: "warning.main", fontWeight: 700 }}
-                     >
+                     <Typography variant="caption" sx={{ color: "warning.main", fontWeight: 700 }}>
                         Requires review
                      </Typography>
                   }
                />
             </Stack>
 
-            <Stack
-               direction="row"
-               alignItems="center"
-               justifyContent="space-between"
-               sx={{ pt: 1 }}
-            >
-               <Tabs
-                  value={activeTab}
-                  onChange={(_, v) => setActiveTab(v)}
-                  sx={{
-                     bgcolor: alpha(theme.palette.primary.main, 0.06),
-                     borderRadius: 999,
-                     p: 0.5,
-                     minHeight: 44,
-                     "& .MuiTabs-indicator": { display: "none" },
-                     "& .MuiTab-root": {
-                        minHeight: 38,
-                        px: 2.5,
-                        borderRadius: 999,
-                        fontWeight: 600,
-                        fontSize: "0.95rem",
-                     },
-                     "& .MuiTab-root.Mui-selected": {
-                        bgcolor: theme.palette.background.paper,
-                        boxShadow: 1,
-                        color: theme.palette.primary.main,
-                     },
-                  }}
+            <Stack spacing={1.5}>
+               <Stack
+                  direction={{ xs: "column", md: "row" }}
+                  alignItems={{ xs: "stretch", md: "center" }}
+                  justifyContent="space-between"
+                  sx={{ pt: 1 }}
+                  spacing={1.5}
                >
-                  <Tab label="All Books" />
-                  <Tab label="Published" />
-                  <Tab label="Drafts" />
-               </Tabs>
-
-               <Stack direction="row" spacing={1} alignItems="center">
-                  <Typography
-                     variant="body2"
-                     color="text.secondary"
-                     sx={{ fontWeight: 600 }}
-                  >
-                     All Age Groups
-                  </Typography>
-                  <IconButton
-                     size="small"
+                  <Tabs
+                     value={activeTab}
+                     onChange={(_, v) => setActiveTab(v)}
                      sx={{
-                        borderRadius: 2,
-                        border: "1px solid",
-                        borderColor: "divider",
-                        bgcolor: "background.paper",
-                        "&:hover": {
-                           bgcolor: alpha(theme.palette.primary.main, 0.06),
+                        bgcolor: alpha(theme.palette.primary.main, 0.06),
+                        borderRadius: 999,
+                        p: 0.5,
+                        minHeight: 44,
+                        "& .MuiTabs-indicator": { display: "none" },
+                        "& .MuiTab-root": {
+                           minHeight: 38,
+                           px: 2.5,
+                           borderRadius: 999,
+                           fontWeight: 600,
+                           fontSize: "0.95rem",
+                        },
+                        "& .MuiTab-root.Mui-selected": {
+                           bgcolor: theme.palette.background.paper,
+                           boxShadow: 1,
+                           color: theme.palette.primary.main,
                         },
                      }}
                   >
-                     <FilterList fontSize="small" />
-                  </IconButton>
+                     <Tab label="All Books" />
+                     <Tab label="Published" />
+                     <Tab label="Drafts" />
+                  </Tabs>
+
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                     <FormControl size="small" sx={{ minWidth: 170 }}>
+                        <InputLabel id="age-group-filter-label">Age Group</InputLabel>
+                        <Select
+                           labelId="age-group-filter-label"
+                           label="Age Group"
+                           value={selectedAgeGroupId}
+                           onChange={(event) => setSelectedAgeGroupId(event.target.value)}
+                        >
+                           <MenuItem value="">All Age Groups</MenuItem>
+                           {ageGroupOptions.map((group) => (
+                              <MenuItem key={group.id} value={group.id}>
+                                 {group.name}
+                              </MenuItem>
+                           ))}
+                        </Select>
+                     </FormControl>
+
+                     <FormControl size="small" sx={{ minWidth: 180 }}>
+                        <InputLabel id="category-filter-label">Category</InputLabel>
+                        <Select
+                           labelId="category-filter-label"
+                           label="Category"
+                           value={selectedCategoryId}
+                           onChange={(event) => setSelectedCategoryId(event.target.value)}
+                        >
+                           <MenuItem value="">All Categories</MenuItem>
+                           {categoryOptions.map((category) => (
+                              <MenuItem key={category.id} value={category.id}>
+                                 {category.name}
+                              </MenuItem>
+                           ))}
+                        </Select>
+                     </FormControl>
+
+                     <Button
+                        type="button"
+                        onClick={() => {
+                           setSelectedAgeGroupId("");
+                           setSelectedCategoryId("");
+                        }}
+                     >
+                        Clear
+                     </Button>
+                  </Stack>
                </Stack>
+
+               {isFetching && (
+                  <Stack direction="row" spacing={1} alignItems="center">
+                     <CircularProgress size={16} />
+                     <Typography variant="caption" color="text.secondary">
+                        Updating books...
+                     </Typography>
+                  </Stack>
+               )}
             </Stack>
 
             <Box
@@ -487,6 +656,7 @@ export function AdminDashboard() {
                               alt={book.title}
                               sx={{ height: "100%", width: "100%", objectFit: "cover" }}
                            />
+
                            {book.status && (
                               <Chip
                                  label={book.status}
@@ -495,26 +665,24 @@ export function AdminDashboard() {
                               />
                            )}
 
-                           <IconButton
-                              size="small"
-                              sx={{
-                                 position: "absolute",
-                                 top: 10,
-                                 right: 10,
-                                 bgcolor: alpha(theme.palette.common.white, 0.92),
-                                 border: "1px solid",
-                                 borderColor: alpha(theme.palette.divider, 0.8),
-                                 "&:hover": {
-                                    bgcolor: theme.palette.common.white,
-                                 },
-                              }}
-                              onClick={(e) => {
-                                 e.stopPropagation();
-                                 navigate(ROUTES.ADMIN.BOOK_EDIT(book.id));
-                              }}
+                           <Stack
+                              direction="row"
+                              spacing={0.5}
+                              sx={{ position: "absolute", top: 10, right: 10 }}
                            >
-                              <Edit sx={{ fontSize: 18, color: "text.primary" }} />
-                           </IconButton>
+                              <IconButton
+                                 size="small"
+                                 sx={{
+                                    bgcolor: alpha(theme.palette.common.white, 0.92),
+                                    border: "1px solid",
+                                    borderColor: alpha(theme.palette.divider, 0.8),
+                                    "&:hover": { bgcolor: theme.palette.common.white },
+                                 }}
+                                 onClick={(event) => openBookActionsMenu(event, book)}
+                              >
+                                 <MoreVert sx={{ fontSize: 18, color: "text.primary" }} />
+                              </IconButton>
+                           </Stack>
                         </Box>
 
                         <CardContent
@@ -589,7 +757,7 @@ export function AdminDashboard() {
                ))}
             </Box>
 
-            {books.length === 0 && !loading && (
+            {books.length === 0 && !initialLoading && (
                <Card
                   sx={{
                      p: { xs: 4, sm: 6 },
@@ -612,23 +780,13 @@ export function AdminDashboard() {
                         bgcolor: alpha(theme.palette.primary.main, 0.12),
                      }}
                   >
-                     <MenuBook
-                        sx={{ fontSize: 34, color: theme.palette.primary.main }}
-                     />
+                     <MenuBook sx={{ fontSize: 34, color: theme.palette.primary.main }} />
                   </Box>
 
-                  <Typography
-                     variant="h6"
-                     sx={{ fontWeight: 800 }}
-                     gutterBottom
-                  >
+                  <Typography variant="h6" sx={{ fontWeight: 800 }} gutterBottom>
                      No books found
                   </Typography>
-                  <Typography
-                     variant="body2"
-                     color="text.secondary"
-                     sx={{ mb: 3 }}
-                  >
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
                      {currentFilter === "all"
                         ? "Start by uploading your first book."
                         : `No ${currentFilter} books available.`}
@@ -638,12 +796,158 @@ export function AdminDashboard() {
                      variant="contained"
                      startIcon={<Add />}
                      onClick={() => navigate(ROUTES.ADMIN.BOOK_CREATE)}
+                     type="button"
                   >
                      Upload New Book
                   </Button>
                </Card>
             )}
          </Stack>
+
+         <Dialog open={Boolean(bookToDelete)} onClose={() => setBookToDelete(null)}>
+            <DialogTitle>Delete Book</DialogTitle>
+            <DialogContent>
+               <Typography variant="body2" color="text.secondary">
+                  {`Are you sure you want to delete "${bookToDelete?.title || "this book"}"?`}
+               </Typography>
+            </DialogContent>
+            <DialogActions>
+               <Button onClick={() => setBookToDelete(null)} disabled={isDeleting} type="button">
+                  Cancel
+               </Button>
+               <Button
+                  color="error"
+                  variant="contained"
+                  onClick={handleDeleteBook}
+                  disabled={isDeleting}
+                  type="button"
+               >
+                  {isDeleting ? "Deleting..." : "Delete"}
+               </Button>
+            </DialogActions>
+         </Dialog>
+
+         <Menu
+            anchorEl={bookActionsAnchor}
+            open={Boolean(bookActionsAnchor && bookActionsTarget)}
+            onClose={closeBookActionsMenu}
+            onClick={(event) => event.stopPropagation()}
+         >
+            <MenuItem
+               onClick={() => {
+                  if (bookActionsTarget) {
+                     navigate(ROUTES.ADMIN.BOOK_EDIT(bookActionsTarget.id));
+                  }
+                  closeBookActionsMenu();
+               }}
+            >
+               Edit
+            </MenuItem>
+            <MenuItem
+               onClick={() => {
+                  if (bookActionsTarget) {
+                     setBookForStatusDialog(bookActionsTarget);
+                  }
+                  closeBookActionsMenu();
+               }}
+            >
+               Change Status
+            </MenuItem>
+            <MenuItem
+               onClick={() => {
+                  if (bookActionsTarget) {
+                     setBookToDelete(bookActionsTarget);
+                  }
+                  closeBookActionsMenu();
+               }}
+               sx={{ color: "error.main" }}
+            >
+               Delete
+            </MenuItem>
+         </Menu>
+
+         <Dialog
+            open={Boolean(bookForStatusDialog)}
+            onClose={() =>
+               statusUpdatingBookId ? undefined : setBookForStatusDialog(null)
+            }
+         >
+            <DialogTitle>Change Book Status</DialogTitle>
+            <DialogContent>
+               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Select the status for "{bookForStatusDialog?.title || "this book"}".
+               </Typography>
+               <Stack direction="row" spacing={1.5}>
+                  <Button
+                     type="button"
+                     variant={
+                        String(bookForStatusDialog?.status).toLowerCase() === "draft"
+                           ? "contained"
+                           : "outlined"
+                     }
+                     disabled={
+                        !bookForStatusDialog ||
+                        statusUpdatingBookId === bookForStatusDialog.id
+                     }
+                     onClick={() =>
+                        bookForStatusDialog &&
+                        handleStatusChange(bookForStatusDialog, "draft")
+                     }
+                     sx={{ minWidth: 110, textTransform: "none" }}
+                  >
+                     {statusUpdatingBookId === bookForStatusDialog?.id
+                        ? "Updating..."
+                        : "Draft"}
+                  </Button>
+                  <Button
+                     type="button"
+                     variant={
+                        String(bookForStatusDialog?.status).toLowerCase() === "published"
+                           ? "contained"
+                           : "outlined"
+                     }
+                     disabled={
+                        !bookForStatusDialog ||
+                        statusUpdatingBookId === bookForStatusDialog.id
+                     }
+                     onClick={() =>
+                        bookForStatusDialog &&
+                        handleStatusChange(bookForStatusDialog, "published")
+                     }
+                     sx={{ minWidth: 120, textTransform: "none" }}
+                  >
+                     {statusUpdatingBookId === bookForStatusDialog?.id
+                        ? "Updating..."
+                        : "Published"}
+                  </Button>
+               </Stack>
+            </DialogContent>
+            <DialogActions>
+               <Button
+                  type="button"
+                  onClick={() => setBookForStatusDialog(null)}
+                  disabled={Boolean(statusUpdatingBookId)}
+               >
+                  Close
+               </Button>
+            </DialogActions>
+         </Dialog>
+
+         <Snackbar
+            open={snackbar.open}
+            autoHideDuration={3200}
+            onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+         >
+            <Alert
+               severity={snackbar.severity}
+               variant="filled"
+               onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+               sx={{ width: "100%" }}
+            >
+               {snackbar.message}
+            </Alert>
+         </Snackbar>
       </Container>
    );
 }

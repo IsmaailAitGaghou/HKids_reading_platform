@@ -69,9 +69,21 @@ export const createBook = async (data: CreateBookRequest): Promise<Book> => {
  * Update a book (Admin only)
  */
 export const updateBook = async (id: string, data: UpdateBookRequest): Promise<Book> => {
-  const response = await patch<{ book: Book }, UpdateBookRequest>(
+  const payload: Record<string, unknown> = {};
+
+  if (typeof data.title === 'string') payload.title = data.title.trim();
+  if (typeof data.summary === 'string') payload.summary = data.summary.trim();
+  if (typeof data.coverImageUrl === 'string') payload.coverImageUrl = data.coverImageUrl.trim();
+  if (typeof data.ageGroupId === 'string') payload.ageGroupId = data.ageGroupId.trim();
+  if (Array.isArray(data.categoryIds)) payload.categoryIds = data.categoryIds;
+  if (Array.isArray(data.pages)) payload.pages = data.pages;
+  if (Array.isArray(data.tags)) payload.tags = data.tags;
+  if (typeof data.visibility === 'string') payload.visibility = data.visibility;
+  if (typeof data.status === 'string') payload.status = data.status;
+
+  const response = await patch<{ book: Book }, Record<string, unknown>>(
     API_ENDPOINTS.BOOKS.BY_ID(id),
-    data
+    payload
   );
   return response.book;
 };

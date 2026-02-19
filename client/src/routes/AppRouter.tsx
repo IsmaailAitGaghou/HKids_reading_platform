@@ -53,6 +53,16 @@ export function AppRouter() {
                      </ProtectedRoute>
                   }
                />
+               <Route
+                  path={ROUTES.ADMIN.BOOK_EDIT(":id")}
+                  element={
+                     <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+                        <AdminLayout>
+                           <AdminBookCreatePage />
+                        </AdminLayout>
+                     </ProtectedRoute>
+                  }
+               />
 
                {/* Parent Routes */}
                <Route

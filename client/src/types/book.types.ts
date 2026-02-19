@@ -10,6 +10,9 @@ export interface Book {
   categoryIds: string[];
   ageGroupId?: string;
   ageGroupIds?: string[];
+  tags?: string[];
+  visibility?: 'private' | 'public';
+  isApproved?: boolean;
   status: BookStatus | 'draft' | 'published' | 'archived';
   totalPages: number;
   reviewNotes?: string;
@@ -55,11 +58,20 @@ export interface CreateBookRequest {
 
 export interface UpdateBookRequest {
   title?: string;
-  author?: string;
-  description?: string;
-  coverImage?: string;
+  summary?: string;
+  coverImageUrl?: string;
+  ageGroupId?: string;
   categoryIds?: string[];
-  ageGroupIds?: string[];
+  pages?: Array<{
+    pageNumber: number;
+    title?: string;
+    text: string;
+    imageUrl?: string;
+    narrationUrl?: string;
+  }>;
+  tags?: string[];
+  visibility?: 'private' | 'public';
+  status?: 'draft' | 'published' | 'archived';
 }
 
 export interface ReviewBookRequest {

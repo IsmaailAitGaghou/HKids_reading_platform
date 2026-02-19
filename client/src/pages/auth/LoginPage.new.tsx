@@ -1,0 +1,241 @@
+import { z as zod } from "zod";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Link as RouterLink } from "react-router-dom";
+import {
+   Box,
+   Link,
+   Alert,
+   IconButton,
+   Stack,
+   Card,
+   Container,
+   InputAdornment,
+} from "@mui/material";
+import { LoadingButton } from "@mui/lab";
+import { Visibility, VisibilityOff } from "@mui/icons-material";
+import { useAuthContext } from "@/context/useAuthContext";
+import { ROUTES } from "@/utils/constants";
+import { Form, Field } from "@/components/hook-form";
+import { FormHead } from "@/components/auth/FormHead";
+
+// ----------------------------------------------------------------------
+
+export type SignInSchemaType = zod.infer<typeof SignInSchema>;
+
+export const SignInSchema = zod.object({
+   email: zod
+      .string()
+      .min(1, { message: "Email is required!" })
+      .email({ message: "Email must be a valid email address!" }),
+   password: zod
+      .string()
+      .min(1, { message: "Password is required!" })
+      .min(6, { message: "Password must be at least 6 characters!" }),
+});
+
+// ----------------------------------------------------------------------
+
+export function LoginPage() {
+   const { login } = useAuthContext();
+   const [showPassword, setShowPassword] = useState(false);
+   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+   const defaultValues: SignInSchemaType = {
+      email: "",
+      password: "",
+   };
+
+   const methods = useForm<SignInSchemaType>({
+      resolver: zodResolver(SignInSchema),
+      defaultValues,
+   });
+
+   const {
+      handleSubmit,
+      formState: { isSubmitting },
+   } = methods;
+
+   const onSubmit = handleSubmit(async (data) => {
+      try {
+         setErrorMessage(null);
+         await login(data.email, data.password);
+      } catch (error) {
+         console.error(error);
+         const message =
+            error instanceof Error
+               ? error.message
+               : "Invalid email or password";
+         setErrorMessage(message);
+      }
+   });
+
+   const renderForm = () => (
+      <Box sx={{ gap: 3, display: "flex", flexDirection: "column" }}>
+         <Field.Text
+            name="email"
+            label="Email address"
+            placeholder="name@example.com"
+            slotProps={{ inputLabel: { shrink: true } }}
+         />
+
+         <Box sx={{ gap: 1.5, display: "flex", flexDirection: "column" }}>
+            <Link
+               component={RouterLink}
+               to="#"
+               variant="body2"
+               color="inherit"
+               sx={{ alignSelf: "flex-end" }}
+            >
+               Forgot password?
+            </Link>
+
+            <Field.Text
+               name="password"
+               label="Password"
+               placeholder="6+ characters"
+               type={showPassword ? "text" : "password"}
+               slotProps={{
+                  inputLabel: { shrink: true },
+                  input: {
+                     endAdornment: (
+                        <InputAdornment position="end">
+                           <IconButton
+                              onClick={() => setShowPassword(!showPassword)}
+                              edge="end"
+                           >
+                              {showPassword ? (
+                                 <VisibilityOff />
+                              ) : (
+                                 <Visibility />
+                              )}
+                           </IconButton>
+                        </InputAdornment>
+                     ),
+                  },
+               }}
+            />
+         </Box>
+
+         <LoadingButton
+            fullWidth
+            color="primary"
+            size="large"
+            type="submit"
+            variant="contained"
+            loading={isSubmitting}
+            loadingIndicator="Signing in..."
+            sx={{
+               textTransform: "none",
+               fontWeight: 600,
+            }}
+         >
+            Sign in
+         </LoadingButton>
+      </Box>
+   );
+
+   return (
+      <Box
+         sx={{
+            minHeight: "100vh",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "background.default",
+            py: 6,
+         }}
+      >
+         <Container maxWidth="sm">
+            <Card
+               sx={{
+                  p: { xs: 3, md: 5 },
+                  boxShadow: (theme) => theme.shadows[20],
+                  borderRadius: 3,
+               }}
+            >
+               <Stack spacing={3}>
+                  <FormHead
+                     title="Sign in to HKids"
+                     description={
+                        <>
+                           {`Don't have an account? `}
+                           <Link
+                              component={RouterLink}
+                              to={ROUTES.REGISTER}
+                              variant="subtitle2"
+                              sx={{ textDecoration: "none" }}
+                           >
+                              Get started
+                           </Link>
+                        </>
+                     }
+                     sx={{ textAlign: { xs: "center", md: "left" } }}
+                  />
+
+                  {!!errorMessage && (
+                     <Alert
+                        severity="error"
+                        onClose={() => setErrorMessage(null)}
+                     >
+                        {errorMessage}
+                     </Alert>
+                  )}
+
+                  <Form methods={methods} onSubmit={onSubmit}>
+                     {renderForm()}
+                  </Form>
+
+                  {/* Divider */}
+                  <Box
+                     sx={{ position: "relative", textAlign: "center", my: 2 }}
+                  >
+                     <Box
+                        sx={{
+                           position: "absolute",
+                           top: "50%",
+                           left: 0,
+                           right: 0,
+                           height: "1px",
+                           backgroundColor: "divider",
+                        }}
+                     />
+                     <Box
+                        component="span"
+                        sx={{
+                           position: "relative",
+                           display: "inline-block",
+                           px: 2,
+                           backgroundColor: "background.paper",
+                           color: "text.secondary",
+                           fontSize: "0.875rem",
+                        }}
+                     >
+                        or
+                     </Box>
+                  </Box>
+
+                  {/* Child Login Link */}
+                  <Link
+                     component={RouterLink}
+                     to={ROUTES.CHILD_LOGIN}
+                     sx={{
+                        display: "block",
+                        textAlign: "center",
+                        color: "primary.main",
+                        textDecoration: "none",
+                        fontWeight: 500,
+                        "&:hover": {
+                           textDecoration: "underline",
+                        },
+                     }}
+                  >
+                     Sign in as Child with PIN
+                  </Link>
+               </Stack>
+            </Card>
+         </Container>
+      </Box>
+   );
+}

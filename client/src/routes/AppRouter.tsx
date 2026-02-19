@@ -7,6 +7,7 @@ import { RegisterPage } from "@/pages/auth/RegisterPage";
 import { ChildLoginPage } from "@/pages/auth/ChildLoginPage";
 import { AdminDashboard } from "@/pages/admin/AdminDashboard";
 import { CategoriesPage } from "@/pages/admin/CategoriesPage";
+import { AgeGroupsPage } from "@/pages/admin/AgeGroupsPage";
 import { AdminBookCreatePage } from "@/pages/admin/AdminBookCreatePage";
 import { ParentDashboard } from "@/pages/parent/ParentDashboard";
 import { KidsLibrary } from "@/pages/kids/KidsLibrary";
@@ -39,6 +40,16 @@ export function AppRouter() {
                      <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
                         <AdminLayout>
                            <CategoriesPage />
+                        </AdminLayout>
+                     </ProtectedRoute>
+                  }
+               />
+               <Route
+                  path={ROUTES.ADMIN.AGE_GROUPS}
+                  element={
+                     <ProtectedRoute allowedRoles={[ROLES.ADMIN]}>
+                        <AdminLayout>
+                           <AgeGroupsPage />
                         </AdminLayout>
                      </ProtectedRoute>
                   }

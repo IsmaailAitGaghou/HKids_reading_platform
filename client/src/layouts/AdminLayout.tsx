@@ -28,22 +28,27 @@ import {
 } from "@mui/material";
 import {
    Category,
+   Groups,
    KeyboardArrowDown,
    Logout,
+   Menu as MenuIcon,
    MenuBook,
    NotificationsNone,
    Search,
    Settings,
-   TrendingUp,
 } from "@mui/icons-material";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuthContext } from "@/context/useAuthContext";
+import { createAgeGroup } from "@/api/ageGroups.api";
 import { createCategory } from "@/api/categories.api";
 import { ROUTES } from "@/utils/constants";
 
-const DRAWER_WIDTH = 280;
+const DRAWER_WIDTH_EXPANDED = 280;
+const DRAWER_WIDTH_COLLAPSED = 92;
 const CATEGORY_CREATED_EVENT = "admin:category-created";
 const OPEN_CATEGORY_DIALOG_EVENT = "admin:open-category-dialog";
+const AGE_GROUP_CREATED_EVENT = "admin:age-group-created";
+const OPEN_AGE_GROUP_DIALOG_EVENT = "admin:open-age-group-dialog";
 
 interface AdminLayoutProps {
    children: ReactNode;
@@ -61,9 +66,9 @@ const navigationItems = [
       icon: <Category />,
    },
    {
-      title: "User Analytics",
-      path: ROUTES.ADMIN.ANALYTICS,
-      icon: <TrendingUp />,
+      title: "Age Groups",
+      path: ROUTES.ADMIN.AGE_GROUPS,
+      icon: <Groups />,
    },
    {
       title: "Settings",
@@ -79,16 +84,34 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
    const isDashboardRoute = location.pathname === ROUTES.ADMIN.DASHBOARD;
    const isCategoriesRoute = location.pathname === ROUTES.ADMIN.CATEGORIES;
+   const isAgeGroupsRoute = location.pathname === ROUTES.ADMIN.AGE_GROUPS;
+
+   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+   const drawerWidth = isSidebarCollapsed
+      ? DRAWER_WIDTH_COLLAPSED
+      : DRAWER_WIDTH_EXPANDED;
 
    const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(
       null
    );
+
    const [isCategoryDialogOpen, setIsCategoryDialogOpen] = useState(false);
    const [categoryDialogError, setCategoryDialogError] = useState("");
    const [isCategorySubmitting, setIsCategorySubmitting] = useState(false);
-
    const [categoryForm, setCategoryForm] = useState({
       name: "",
+      description: "",
+      sortOrder: "0",
+      isActive: true,
+   });
+
+   const [isAgeGroupDialogOpen, setIsAgeGroupDialogOpen] = useState(false);
+   const [ageGroupDialogError, setAgeGroupDialogError] = useState("");
+   const [isAgeGroupSubmitting, setIsAgeGroupSubmitting] = useState(false);
+   const [ageGroupForm, setAgeGroupForm] = useState({
+      name: "",
+      minAge: "2",
+      maxAge: "12",
       description: "",
       sortOrder: "0",
       isActive: true,
@@ -102,6 +125,18 @@ export function AdminLayout({ children }: AdminLayoutProps) {
          isActive: true,
       });
       setCategoryDialogError("");
+   };
+
+   const resetAgeGroupForm = () => {
+      setAgeGroupForm({
+         name: "",
+         minAge: "2",
+         maxAge: "12",
+         description: "",
+         sortOrder: "0",
+         isActive: true,
+      });
+      setAgeGroupDialogError("");
    };
 
    const getErrorMessage = (error: unknown, fallback: string) => {
@@ -140,11 +175,19 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
    useEffect(() => {
       const openCategoryDialog = () => setIsCategoryDialogOpen(true);
+      const openAgeGroupDialog = () => setIsAgeGroupDialogOpen(true);
+
       window.addEventListener(OPEN_CATEGORY_DIALOG_EVENT, openCategoryDialog);
+      window.addEventListener(OPEN_AGE_GROUP_DIALOG_EVENT, openAgeGroupDialog);
+
       return () => {
          window.removeEventListener(
             OPEN_CATEGORY_DIALOG_EVENT,
             openCategoryDialog
+         );
+         window.removeEventListener(
+            OPEN_AGE_GROUP_DIALOG_EVENT,
+            openAgeGroupDialog
          );
       };
    }, []);
@@ -184,23 +227,80 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       }
    };
 
+   const handleCloseAgeGroupDialog = () => {
+      if (isAgeGroupSubmitting) return;
+      setIsAgeGroupDialogOpen(false);
+      resetAgeGroupForm();
+   };
+
+   const handleCreateAgeGroup = async () => {
+      if (!ageGroupForm.name.trim()) {
+         setAgeGroupDialogError("Age group name is required.");
+         return;
+      }
+
+      const minAge = Number(ageGroupForm.minAge);
+      const maxAge = Number(ageGroupForm.maxAge);
+      if (!Number.isFinite(minAge) || !Number.isFinite(maxAge)) {
+         setAgeGroupDialogError("Min age and max age are required.");
+         return;
+      }
+      if (minAge > maxAge) {
+         setAgeGroupDialogError("Min age must be less than or equal to max age.");
+         return;
+      }
+
+      try {
+         setIsAgeGroupSubmitting(true);
+         setAgeGroupDialogError("");
+         await createAgeGroup({
+            name: ageGroupForm.name.trim(),
+            minAge,
+            maxAge,
+            description: ageGroupForm.description.trim() || undefined,
+            sortOrder: Number(ageGroupForm.sortOrder) || 0,
+            isActive: ageGroupForm.isActive,
+         });
+
+         window.dispatchEvent(new Event(AGE_GROUP_CREATED_EVENT));
+         setIsAgeGroupDialogOpen(false);
+         resetAgeGroupForm();
+      } catch (error) {
+         setAgeGroupDialogError(
+            getErrorMessage(error, "Failed to create age group. Please try again.")
+         );
+      } finally {
+         setIsAgeGroupSubmitting(false);
+      }
+   };
+
    return (
       <Box sx={{ display: "flex", minHeight: "100vh" }}>
          <Drawer
             variant="permanent"
             sx={{
-               width: DRAWER_WIDTH,
+               width: drawerWidth,
                flexShrink: 0,
+               transition: "width 200ms ease",
                "& .MuiDrawer-paper": {
-                  width: DRAWER_WIDTH,
+                  width: drawerWidth,
                   boxSizing: "border-box",
                   bgcolor: "#fff",
                   borderRight: "1px solid",
                   borderColor: "divider",
+                  overflowX: "hidden",
+                  transition: "width 200ms ease",
                },
             }}
          >
-            <Box sx={{ px: 2, py: 1.4 }}>
+            <Box
+               sx={{
+                  px: isSidebarCollapsed ? 1 : 2,
+                  py: 1.4,
+                  display: "flex",
+                  justifyContent: isSidebarCollapsed ? "center" : "flex-start",
+               }}
+            >
                <Stack direction="row" spacing={1.5} alignItems="center">
                   <Box
                      sx={{
@@ -216,27 +316,29 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                   >
                      <MenuBook sx={{ fontSize: 24 }} />
                   </Box>
-                  <Box>
-                     <Typography
-                        variant="h6"
-                        sx={{ fontWeight: 700, color: "#702AFA" }}
-                     >
-                        HKids
-                     </Typography>
-                     <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ fontSize: "0.7rem" }}
-                     >
-                        Admin Portal
-                     </Typography>
-                  </Box>
+
+                  {!isSidebarCollapsed && (
+                     <Box>
+                        <Typography
+                           variant="h6"
+                           sx={{ fontWeight: 700, color: "#702AFA" }}
+                        >
+                           HKids
+                        </Typography>
+                        <Typography
+                           variant="caption"
+                           color="text.secondary"
+                           sx={{ fontSize: "0.7rem" }}
+                        >
+                           Admin Portal
+                        </Typography>
+                     </Box>
+                  )}
                </Stack>
             </Box>
 
-            <Divider />
 
-            <List sx={{ px: 1, py: 2, flex: 1 }}>
+            <List sx={{ px: isSidebarCollapsed ? 0.5 : 1, py: 2, flex: 1 }}>
                {navigationItems.map((item) => {
                   const isActive = location.pathname === item.path;
 
@@ -247,25 +349,30 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                            sx={{
                               borderRadius: 2,
                               minHeight: 48,
+                              justifyContent: isSidebarCollapsed ? "center" : "flex-start",
+                              px: isSidebarCollapsed ? 1 : 1.5,
                               bgcolor: isActive ? "#F0E7FF" : "transparent",
                               color: isActive ? "#702AFA" : "text.primary",
                            }}
                         >
                            <ListItemIcon
                               sx={{
-                                 minWidth: 40,
+                                 minWidth: isSidebarCollapsed ? 0 : 40,
+                                 mr: isSidebarCollapsed ? 0 : 0.5,
                                  color: isActive ? "#702AFA" : "text.secondary",
                               }}
                            >
                               {item.icon}
                            </ListItemIcon>
-                           <ListItemText
-                              primary={item.title}
-                              primaryTypographyProps={{
-                                 fontWeight: isActive ? 600 : 500,
-                                 fontSize: "0.95rem",
-                              }}
-                           />
+                           {!isSidebarCollapsed && (
+                              <ListItemText
+                                 primary={item.title}
+                                 primaryTypographyProps={{
+                                    fontWeight: isActive ? 600 : 500,
+                                    fontSize: "0.95rem",
+                                 }}
+                              />
+                           )}
                         </ListItemButton>
                      </ListItem>
                   );
@@ -274,11 +381,12 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
             <Divider />
 
-            <Box sx={{ p: 2 }}>
+            <Box sx={{ p: isSidebarCollapsed ? 1 : 2 }}>
                <Stack
                   direction="row"
-                  spacing={2}
+                  spacing={isSidebarCollapsed ? 0 : 1.5}
                   alignItems="center"
+                  justifyContent={isSidebarCollapsed ? "center" : "flex-start"}
                   sx={{
                      p: 1.5,
                      borderRadius: 2,
@@ -296,24 +404,29 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                   >
                      {(user?.name?.trim()?.charAt(0) || "A").toUpperCase()}
                   </Avatar>
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                     <Typography
-                        variant="subtitle2"
-                        sx={{ fontWeight: 600, fontSize: "0.875rem" }}
-                        noWrap
-                        color="text.primary"
-                     >
-                        {user?.name}
-                     </Typography>
-                     <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{ fontSize: "0.75rem" }}
-                     >
-                        {user?.role}
-                     </Typography>
-                  </Box>
-                  <KeyboardArrowDown sx={{ color: "text.secondary" }} />
+
+                  {!isSidebarCollapsed && (
+                     <>
+                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                           <Typography
+                              variant="subtitle2"
+                              sx={{ fontWeight: 600, fontSize: "0.875rem" }}
+                              noWrap
+                              color="text.primary"
+                           >
+                              {user?.name}
+                           </Typography>
+                           <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              sx={{ fontSize: "0.75rem" }}
+                           >
+                              {user?.role}
+                           </Typography>
+                        </Box>
+                        <KeyboardArrowDown sx={{ color: "text.secondary" }} />
+                     </>
+                  )}
                </Stack>
             </Box>
 
@@ -359,28 +472,42 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                   gap: 2,
                }}
             >
-               <Stack
-                  direction="row"
-                  alignItems="center"
-                  sx={{
-                     width: "100%",
-                     maxWidth: 620,
-                     height: 44,
-                     px: 2,
-                     borderRadius: 999,
-                     bgcolor: "#F3F4F6",
-                  }}
-               >
-                  <Search sx={{ fontSize: 20, color: "text.secondary", mr: 1 }} />
-                  <InputBase
-                     placeholder="Search books, authors, or categories..."
+               <Stack direction="row" alignItems="center" spacing={1.5} sx={{ width: "100%" }}>
+                  <IconButton
+                     type="button"
+                     onClick={() => setIsSidebarCollapsed((prev) => !prev)}
                      sx={{
-                        flex: 1,
-                        fontSize: "0.95rem",
+                        width: 36,
+                        height: 36,
                         color: "text.secondary",
                      }}
-                     inputProps={{ "aria-label": "Search admin content" }}
-                  />
+                  >
+                     <MenuIcon />
+                  </IconButton>
+
+                  <Stack
+                     direction="row"
+                     alignItems="center"
+                     sx={{
+                        width: "100%",
+                        maxWidth: 620,
+                        height: 44,
+                        px: 2,
+                        borderRadius: 999,
+                        bgcolor: "#F3F4F6",
+                     }}
+                  >
+                     <Search sx={{ fontSize: 20, color: "text.secondary", mr: 1 }} />
+                     <InputBase
+                        placeholder="Search books, authors, or categories..."
+                        sx={{
+                           flex: 1,
+                           fontSize: "0.95rem",
+                           color: "text.secondary",
+                        }}
+                        inputProps={{ "aria-label": "Search admin content" }}
+                     />
+                  </Stack>
                </Stack>
 
                <Stack direction="row" alignItems="center" spacing={1.5}>
@@ -407,6 +534,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                            fontWeight: 600,
                            whiteSpace: "nowrap",
                         }}
+                        type="button"
                      >
                         Upload New Book
                      </Button>
@@ -424,8 +552,27 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                            fontWeight: 600,
                            whiteSpace: "nowrap",
                         }}
+                        type="button"
                      >
                         Add New Category
+                     </Button>
+                  )}
+
+                  {isAgeGroupsRoute && (
+                     <Button
+                        variant="contained"
+                        onClick={() => setIsAgeGroupDialogOpen(true)}
+                        sx={{
+                           px: 2.75,
+                           py: 1,
+                           borderRadius: 999,
+                           fontSize: "0.875rem",
+                           fontWeight: 600,
+                           whiteSpace: "nowrap",
+                        }}
+                        type="button"
+                     >
+                        Add New Age Group
                      </Button>
                   )}
                </Stack>
@@ -512,6 +659,120 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                   disabled={isCategorySubmitting}
                >
                   {isCategorySubmitting ? "Creating..." : "Create Category"}
+               </Button>
+            </DialogActions>
+         </Dialog>
+
+         <Dialog
+            open={isAgeGroupDialogOpen}
+            onClose={handleCloseAgeGroupDialog}
+            fullWidth
+            maxWidth="sm"
+         >
+            <DialogTitle>Add New Age Group</DialogTitle>
+            <DialogContent dividers>
+               <Stack spacing={2} sx={{ pt: 1 }}>
+                  {ageGroupDialogError && <Alert severity="error">{ageGroupDialogError}</Alert>}
+
+                  <TextField
+                     label="Name"
+                     required
+                     fullWidth
+                     value={ageGroupForm.name}
+                     onChange={(event) =>
+                        setAgeGroupForm((prev) => ({ ...prev, name: event.target.value }))
+                     }
+                  />
+
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                     <TextField
+                        label="Min Age"
+                        type="number"
+                        inputProps={{ min: 0 }}
+                        fullWidth
+                        value={ageGroupForm.minAge}
+                        onChange={(event) =>
+                           setAgeGroupForm((prev) => ({
+                              ...prev,
+                              minAge: event.target.value,
+                           }))
+                        }
+                     />
+
+                     <TextField
+                        label="Max Age"
+                        type="number"
+                        inputProps={{ min: 0 }}
+                        fullWidth
+                        value={ageGroupForm.maxAge}
+                        onChange={(event) =>
+                           setAgeGroupForm((prev) => ({
+                              ...prev,
+                              maxAge: event.target.value,
+                           }))
+                        }
+                     />
+                  </Stack>
+
+                  <TextField
+                     label="Description"
+                     fullWidth
+                     multiline
+                     minRows={3}
+                     value={ageGroupForm.description}
+                     onChange={(event) =>
+                        setAgeGroupForm((prev) => ({
+                           ...prev,
+                           description: event.target.value,
+                        }))
+                     }
+                  />
+
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                     <TextField
+                        label="Sort Order"
+                        type="number"
+                        fullWidth
+                        inputProps={{ min: 0 }}
+                        value={ageGroupForm.sortOrder}
+                        onChange={(event) =>
+                           setAgeGroupForm((prev) => ({
+                              ...prev,
+                              sortOrder: event.target.value,
+                           }))
+                        }
+                     />
+
+                     <FormControl fullWidth>
+                        <InputLabel id="age-group-status-label">Status</InputLabel>
+                        <Select
+                           labelId="age-group-status-label"
+                           label="Status"
+                           value={ageGroupForm.isActive ? "active" : "inactive"}
+                           onChange={(event) =>
+                              setAgeGroupForm((prev) => ({
+                                 ...prev,
+                                 isActive: event.target.value === "active",
+                              }))
+                           }
+                        >
+                           <MenuItem value="active">Active</MenuItem>
+                           <MenuItem value="inactive">Inactive</MenuItem>
+                        </Select>
+                     </FormControl>
+                  </Stack>
+               </Stack>
+            </DialogContent>
+            <DialogActions sx={{ px: 3, py: 2 }}>
+               <Button onClick={handleCloseAgeGroupDialog} disabled={isAgeGroupSubmitting}>
+                  Cancel
+               </Button>
+               <Button
+                  variant="contained"
+                  onClick={handleCreateAgeGroup}
+                  disabled={isAgeGroupSubmitting}
+               >
+                  {isAgeGroupSubmitting ? "Creating..." : "Create Age Group"}
                </Button>
             </DialogActions>
          </Dialog>

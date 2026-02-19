@@ -3,11 +3,6 @@ import {
    Alert,
    Box,
    Button,
-   Card,
-   CardActionArea,
-   CardContent,
-   CardMedia,
-   Chip,
    CircularProgress,
    Container,
    Dialog,
@@ -15,7 +10,6 @@ import {
    DialogContent,
    DialogTitle,
    FormControl,
-   IconButton,
    InputLabel,
    Menu,
    MenuItem,
@@ -28,12 +22,9 @@ import {
 } from "@mui/material";
 import { alpha, useTheme } from "@mui/material/styles";
 import {
-   Add,
    AutoStories,
-   Category as CategoryIcon,
    Description,
    MenuBook,
-   MoreVert,
    TrendingUp,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
@@ -43,6 +34,12 @@ import { deleteBook, listBooks, publishBook, unpublishBook } from "@/api/books.a
 import { listCategories } from "@/api/categories.api";
 import type { Book } from "@/types/book.types";
 import { ROUTES } from "@/utils/constants";
+import {
+   DashboardSkeleton,
+   StatCard,
+   BookCard,
+   EmptyState,
+} from "@/components/admin";
 
 interface DashboardStats {
    totalBooks: number;
@@ -51,74 +48,6 @@ interface DashboardStats {
 }
 
 type SnackbarSeverity = "success" | "error" | "info" | "warning";
-
-function StatCard({
-   label,
-   value,
-   helper,
-   icon,
-   iconBg,
-}: {
-   label: string;
-   value: string;
-   helper?: React.ReactNode;
-   icon: React.ReactNode;
-   iconBg: string;
-}) {
-   return (
-      <Card
-         sx={{
-            flex: 1,
-            p: 3,
-            borderRadius: 3,
-            bgcolor: "background.paper",
-            border: "1px solid",
-            borderColor: "divider",
-            boxShadow: 1,
-            transition: "transform 200ms ease, box-shadow 200ms ease",
-            "&:hover": { transform: "translateY(-2px)", boxShadow: 3 },
-         }}
-      >
-         <Stack spacing={1.5}>
-            <Stack
-               direction="row"
-               alignItems="center"
-               justifyContent="space-between"
-            >
-               <Typography
-                  variant="body2"
-                  color="text.secondary"
-                  sx={{ fontWeight: 600 }}
-               >
-                  {label}
-               </Typography>
-
-               <Box
-                  sx={{
-                     width: 40,
-                     height: 40,
-                     borderRadius: 2,
-                     display: "grid",
-                     placeItems: "center",
-                     bgcolor: iconBg,
-                  }}
-               >
-                  {icon}
-               </Box>
-            </Stack>
-
-            <Typography
-               variant="h3"
-               sx={{ fontWeight: 800, fontSize: "2rem", lineHeight: 1.1 }}
-            >
-               {value}
-            </Typography>
-
-            {helper}
-         </Stack>
-      </Card>
-   );
-}
 
 export function AdminDashboard() {
    const theme = useTheme();
@@ -416,19 +345,7 @@ export function AdminDashboard() {
    };
 
    if (initialLoading) {
-      return (
-         <Container maxWidth="xl" sx={{ py: 6 }}>
-            <Box
-               sx={{
-                  display: "grid",
-                  placeItems: "center",
-                  minHeight: "60vh",
-               }}
-            >
-               <CircularProgress size={56} />
-            </Box>
-         </Container>
-      );
+      return <DashboardSkeleton />;
    }
 
    if (error) {
@@ -614,193 +531,30 @@ export function AdminDashboard() {
                }}
             >
                {books.map((book) => (
-                  <Card
+                  <BookCard
                      key={book.id}
-                     sx={{
-                        overflow: "hidden",
-                        cursor: "pointer",
-                        borderRadius: 3,
-                        border: "1px solid",
-                        borderColor: "divider",
-                        boxShadow: 1,
-                        height: 460,
-                        display: "flex",
-                        transition: "transform 200ms ease, box-shadow 200ms ease",
-                        "&:hover": {
-                           transform: "translateY(-3px)",
-                           boxShadow: 4,
-                        },
-                     }}
-                  >
-                     <CardActionArea
-                        sx={{
-                           display: "flex",
-                           flexDirection: "column",
-                           alignItems: "stretch",
-                           height: "100%",
-                        }}
-                        onClick={() => navigate(ROUTES.ADMIN.BOOK_EDIT(book.id))}
-                     >
-                        <Box
-                           sx={{
-                              position: "relative",
-                              height: 280,
-                              width: "100%",
-                              overflow: "hidden",
-                              flexShrink: 0,
-                           }}
-                        >
-                           <CardMedia
-                              component="img"
-                              image={book.coverImageUrl || "/placeholder-book.png"}
-                              alt={book.title}
-                              sx={{ height: "100%", width: "100%", objectFit: "cover" }}
-                           />
-
-                           {book.status && (
-                              <Chip
-                                 label={book.status}
-                                 size="small"
-                                 sx={statusChipSx(book.status)}
-                              />
-                           )}
-
-                           <Stack
-                              direction="row"
-                              spacing={0.5}
-                              sx={{ position: "absolute", top: 10, right: 10 }}
-                           >
-                              <IconButton
-                                 size="small"
-                                 sx={{
-                                    bgcolor: alpha(theme.palette.common.white, 0.92),
-                                    border: "1px solid",
-                                    borderColor: alpha(theme.palette.divider, 0.8),
-                                    "&:hover": { bgcolor: theme.palette.common.white },
-                                 }}
-                                 onClick={(event) => openBookActionsMenu(event, book)}
-                              >
-                                 <MoreVert sx={{ fontSize: 18, color: "text.primary" }} />
-                              </IconButton>
-                           </Stack>
-                        </Box>
-
-                        <CardContent
-                           sx={{
-                              p: 2,
-                              display: "flex",
-                              flexDirection: "column",
-                              justifyContent: "space-between",
-                              gap: 1.25,
-                              flexGrow: 1,
-                              width: "100%",
-                           }}
-                        >
-                           <Typography
-                              variant="subtitle1"
-                              sx={{
-                                 fontWeight: 700,
-                                 minHeight: 52,
-                                 overflow: "hidden",
-                                 textOverflow: "ellipsis",
-                                 display: "-webkit-box",
-                                 WebkitLineClamp: 2,
-                                 WebkitBoxOrient: "vertical",
-                              }}
-                           >
-                              {book.title}
-                           </Typography>
-
-                           <Stack spacing={0.75}>
-                              <Typography
-                                 variant="caption"
-                                 color="text.secondary"
-                                 sx={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 0.75,
-                                    fontWeight: 600,
-                                 }}
-                              >
-                                 <MenuBook sx={{ fontSize: 14 }} />
-                                 Ages: {getAgeGroupLabel(book)}
-                              </Typography>
-
-                              <Typography
-                                 variant="caption"
-                                 color="text.secondary"
-                                 sx={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: 0.75,
-                                    fontWeight: 600,
-                                    overflow: "hidden",
-                                    textOverflow: "ellipsis",
-                                    whiteSpace: "nowrap",
-                                 }}
-                              >
-                                 <CategoryIcon sx={{ fontSize: 14 }} />
-                                 Category: {getCategoryLabel(book)}
-                              </Typography>
-
-                              <Typography
-                                 variant="caption"
-                                 color="text.disabled"
-                                 sx={{ fontWeight: 600 }}
-                              >
-                                 ID: {book.id.slice(0, 6)}
-                              </Typography>
-                           </Stack>
-                        </CardContent>
-                     </CardActionArea>
-                  </Card>
+                     book={book}
+                     statusChipSx={statusChipSx}
+                     ageGroupLabel={getAgeGroupLabel(book)}
+                     categoryLabel={getCategoryLabel(book)}
+                     onCardClick={() => navigate(ROUTES.ADMIN.BOOK_EDIT(book.id))}
+                     onMenuClick={(event) => openBookActionsMenu(event, book)}
+                  />
                ))}
             </Box>
 
             {books.length === 0 && !initialLoading && (
-               <Card
-                  sx={{
-                     p: { xs: 4, sm: 6 },
-                     textAlign: "center",
-                     borderRadius: 3,
-                     border: "1px dashed",
-                     borderColor: alpha(theme.palette.primary.main, 0.35),
-                     bgcolor: alpha(theme.palette.primary.main, 0.04),
-                  }}
-               >
-                  <Box
-                     sx={{
-                        width: 72,
-                        height: 72,
-                        borderRadius: 999,
-                        mx: "auto",
-                        mb: 2,
-                        display: "grid",
-                        placeItems: "center",
-                        bgcolor: alpha(theme.palette.primary.main, 0.12),
-                     }}
-                  >
-                     <MenuBook sx={{ fontSize: 34, color: theme.palette.primary.main }} />
-                  </Box>
-
-                  <Typography variant="h6" sx={{ fontWeight: 800 }} gutterBottom>
-                     No books found
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                     {currentFilter === "all"
+               <EmptyState
+                  icon={<MenuBook sx={{ fontSize: 34 }} />}
+                  title="No books found"
+                  description={
+                     currentFilter === "all"
                         ? "Start by uploading your first book."
-                        : `No ${currentFilter} books available.`}
-                  </Typography>
-
-                  <Button
-                     variant="contained"
-                     startIcon={<Add />}
-                     onClick={() => navigate(ROUTES.ADMIN.BOOK_CREATE)}
-                     type="button"
-                  >
-                     Upload New Book
-                  </Button>
-               </Card>
+                        : `No ${currentFilter} books available.`
+                  }
+                  actionLabel="Upload New Book"
+                  onAction={() => navigate(ROUTES.ADMIN.BOOK_CREATE)}
+               />
             )}
          </Stack>
 

@@ -35,35 +35,37 @@ import {
    VisibilityOff,
 } from "@mui/icons-material";
 import {
-   deleteCategory,
-   listCategories,
-   type Category,
-   updateCategory,
-} from "@/api/categories.api";
+   deleteAgeGroup,
+   listAgeGroups,
+   type AgeGroup,
+   updateAgeGroup,
+} from "@/api/ageGroups.api";
 
-const CATEGORY_CREATED_EVENT = "admin:category-created";
-const OPEN_CATEGORY_DIALOG_EVENT = "admin:open-category-dialog";
+const AGE_GROUP_CREATED_EVENT = "admin:age-group-created";
+const OPEN_AGE_GROUP_DIALOG_EVENT = "admin:open-age-group-dialog";
 
 type SnackbarSeverity = "success" | "error" | "info" | "warning";
 
-export function CategoriesPage() {
-   const [categories, setCategories] = useState<Category[]>([]);
+export function AgeGroupsPage() {
+   const [ageGroups, setAgeGroups] = useState<AgeGroup[]>([]);
    const [loading, setLoading] = useState(true);
    const [error, setError] = useState<string | null>(null);
    const [refreshKey, setRefreshKey] = useState(0);
 
-   const [editTarget, setEditTarget] = useState<Category | null>(null);
-   const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
+   const [editTarget, setEditTarget] = useState<AgeGroup | null>(null);
+   const [deleteTarget, setDeleteTarget] = useState<AgeGroup | null>(null);
    const [isSubmitting, setIsSubmitting] = useState(false);
    const [isDeleting, setIsDeleting] = useState(false);
 
+   const [formError, setFormError] = useState("");
    const [editForm, setEditForm] = useState({
       name: "",
+      minAge: "0",
+      maxAge: "0",
       description: "",
       sortOrder: "0",
       isActive: true,
    });
-   const [formError, setFormError] = useState("");
 
    const [snackbar, setSnackbar] = useState<{
       open: boolean;
@@ -109,15 +111,16 @@ export function CategoriesPage() {
    };
 
    useEffect(() => {
-      const handleCategoryCreated = () => {
+      const handleAgeGroupCreated = () => {
          setRefreshKey((prev) => prev + 1);
       };
 
-      window.addEventListener(CATEGORY_CREATED_EVENT, handleCategoryCreated);
+      window.addEventListener(AGE_GROUP_CREATED_EVENT, handleAgeGroupCreated);
+
       return () => {
          window.removeEventListener(
-            CATEGORY_CREATED_EVENT,
-            handleCategoryCreated
+            AGE_GROUP_CREATED_EVENT,
+            handleAgeGroupCreated
          );
       };
    }, []);
@@ -125,16 +128,16 @@ export function CategoriesPage() {
    useEffect(() => {
       let mounted = true;
 
-      const fetchCategories = async () => {
+      const fetchAgeGroups = async () => {
          try {
             setLoading(true);
             setError(null);
-            const data = await listCategories();
+            const data = await listAgeGroups();
             if (!mounted) return;
-            setCategories(data.categories || []);
+            setAgeGroups(data.ageGroups || []);
          } catch (err) {
             if (!mounted) return;
-            setError(getErrorMessage(err, "Failed to load categories."));
+            setError(getErrorMessage(err, "Failed to load age groups."));
          } finally {
             if (mounted) {
                setLoading(false);
@@ -142,54 +145,70 @@ export function CategoriesPage() {
          }
       };
 
-      void fetchCategories();
+      void fetchAgeGroups();
+
       return () => {
          mounted = false;
       };
    }, [refreshKey]);
 
-   const emptyState = useMemo(() => !loading && categories.length === 0, [loading, categories]);
+   const emptyState = useMemo(() => !loading && ageGroups.length === 0, [loading, ageGroups]);
 
-   const openEditDialog = (category: Category) => {
-      setEditTarget(category);
+   const openEditDialog = (ageGroup: AgeGroup) => {
+      setEditTarget(ageGroup);
       setFormError("");
       setEditForm({
-         name: category.name,
-         description: category.description || "",
-         sortOrder: String(category.sortOrder),
-         isActive: category.isActive,
+         name: ageGroup.name,
+         minAge: String(ageGroup.minAge),
+         maxAge: String(ageGroup.maxAge),
+         description: ageGroup.description || "",
+         sortOrder: String(ageGroup.sortOrder),
+         isActive: ageGroup.isActive,
       });
    };
 
    const handleSaveEdit = async () => {
       if (!editTarget) return;
       if (!editForm.name.trim()) {
-         setFormError("Category name is required.");
+         setFormError("Age group name is required.");
+         return;
+      }
+
+      const minAge = Number(editForm.minAge);
+      const maxAge = Number(editForm.maxAge);
+      if (!Number.isFinite(minAge) || !Number.isFinite(maxAge) || minAge < 0 || maxAge < 0) {
+         setFormError("Min age and max age must be valid numbers.");
+         return;
+      }
+      if (minAge > maxAge) {
+         setFormError("Min age must be less than or equal to max age.");
          return;
       }
 
       try {
          setIsSubmitting(true);
          setFormError("");
-         const updated = await updateCategory(editTarget.id, {
+         const updated = await updateAgeGroup(editTarget.id, {
             name: editForm.name.trim(),
+            minAge,
+            maxAge,
             description: editForm.description.trim() || undefined,
             sortOrder: Number(editForm.sortOrder) || 0,
             isActive: editForm.isActive,
          });
 
-         setCategories((prev) =>
+         setAgeGroups((prev) =>
             prev.map((item) => (item.id === updated.id ? updated : item))
          );
 
          setSnackbar({
             open: true,
             severity: "success",
-            message: "Category updated successfully.",
+            message: "Age group updated successfully.",
          });
          setEditTarget(null);
       } catch (err) {
-         setFormError(getErrorMessage(err, "Failed to update category."));
+         setFormError(getErrorMessage(err, "Failed to update age group."));
       } finally {
          setIsSubmitting(false);
       }
@@ -197,25 +216,25 @@ export function CategoriesPage() {
 
    const handleDelete = async () => {
       if (!deleteTarget) return;
-      const previous = categories;
 
+      const previous = ageGroups;
       setIsDeleting(true);
-      setCategories((prev) => prev.filter((item) => item.id !== deleteTarget.id));
+      setAgeGroups((prev) => prev.filter((item) => item.id !== deleteTarget.id));
 
       try {
-         await deleteCategory(deleteTarget.id);
+         await deleteAgeGroup(deleteTarget.id);
          setSnackbar({
             open: true,
             severity: "success",
-            message: "Category deleted successfully.",
+            message: "Age group deleted successfully.",
          });
          setDeleteTarget(null);
       } catch (err) {
-         setCategories(previous);
+         setAgeGroups(previous);
          setSnackbar({
             open: true,
             severity: "error",
-            message: getErrorMessage(err, "Failed to delete category."),
+            message: getErrorMessage(err, "Failed to delete age group."),
          });
       } finally {
          setIsDeleting(false);
@@ -235,10 +254,10 @@ export function CategoriesPage() {
          <Stack spacing={4}>
             <Box>
                <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
-                  Categories
+                  Age Groups
                </Typography>
                <Typography variant="body2" color="text.secondary">
-                  Organize your books by topics and themes.
+                  Manage reading levels and recommended age ranges.
                </Typography>
             </Box>
 
@@ -247,7 +266,8 @@ export function CategoriesPage() {
                   <Table>
                      <TableHead>
                         <TableRow sx={{ bgcolor: "grey.50" }}>
-                           <TableCell sx={{ fontWeight: 600 }}>Category Name</TableCell>
+                           <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
+                           <TableCell sx={{ fontWeight: 600 }}>Age Range</TableCell>
                            <TableCell sx={{ fontWeight: 600 }}>Description</TableCell>
                            <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
                            <TableCell sx={{ fontWeight: 600 }}>Sort Order</TableCell>
@@ -259,66 +279,70 @@ export function CategoriesPage() {
                      <TableBody>
                         {loading &&
                            Array.from({ length: 6 }).map((_, index) => (
-                              <TableRow key={`category-skeleton-${index}`}>
-                                 <TableCell><Skeleton variant="text" width={200} /></TableCell>
+                              <TableRow key={`age-group-skeleton-${index}`}>
+                                 <TableCell><Skeleton variant="text" width={180} /></TableCell>
+                                 <TableCell><Skeleton variant="text" width={110} /></TableCell>
                                  <TableCell><Skeleton variant="text" width="80%" /></TableCell>
                                  <TableCell><Skeleton variant="rounded" width={88} height={24} /></TableCell>
-                                 <TableCell><Skeleton variant="text" width={48} /></TableCell>
+                                 <TableCell><Skeleton variant="text" width={40} /></TableCell>
                                  <TableCell align="right">
-                                    <Skeleton variant="rounded" width={120} height={28} sx={{ ml: "auto" }} />
+                                    <Skeleton variant="rounded" width={84} height={28} sx={{ ml: "auto" }} />
                                  </TableCell>
                               </TableRow>
                            ))}
 
                         {!loading &&
-                           categories.map((category) => (
-                              <TableRow key={category.id} sx={{ "&:hover": { bgcolor: "grey.50" } }}>
+                           ageGroups.map((ageGroup) => (
+                              <TableRow key={ageGroup.id} sx={{ "&:hover": { bgcolor: "grey.50" } }}>
                                  <TableCell>
-                                    <Stack direction="row" spacing={1} alignItems="center">
-                                       <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                          {category.name}
-                                       </Typography>
-                                    </Stack>
+                                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                       {ageGroup.name}
+                                    </Typography>
+                                 </TableCell>
+                                 <TableCell>
+                                    <Typography variant="body2">
+                                       {ageGroup.minAge} - {ageGroup.maxAge}
+                                    </Typography>
                                  </TableCell>
                                  <TableCell>
                                     <Typography
                                        variant="body2"
                                        color="text.secondary"
                                        sx={{
-                                          maxWidth: 400,
+                                          maxWidth: 420,
                                           overflow: "hidden",
                                           textOverflow: "ellipsis",
                                           whiteSpace: "nowrap",
                                        }}
                                     >
-                                       {category.description || "-"}
+                                       {ageGroup.description || "-"}
                                     </Typography>
                                  </TableCell>
                                  <TableCell>
                                     <Chip
-                                       label={category.isActive ? "Active" : "Inactive"}
+                                       label={ageGroup.isActive ? "Active" : "Inactive"}
                                        size="small"
                                        icon={
-                                          category.isActive ? (
+                                          ageGroup.isActive ? (
                                              <Visibility sx={{ fontSize: 16 }} />
                                           ) : (
                                              <VisibilityOff sx={{ fontSize: 16 }} />
                                           )
                                        }
                                        sx={{
-                                          bgcolor: category.isActive ? "#E8F5E9" : "#ECEFF1",
-                                          color: category.isActive ? "#10B981" : "#64748B",
+                                          bgcolor: ageGroup.isActive ? "#E8F5E9" : "#ECEFF1",
+                                          color: ageGroup.isActive ? "#10B981" : "#64748B",
                                           fontWeight: 600,
                                        }}
                                     />
                                  </TableCell>
-                                 <TableCell>{category.sortOrder}</TableCell>
+                                 <TableCell>{ageGroup.sortOrder}</TableCell>
                                  <TableCell align="right">
                                     <Stack direction="row" spacing={1} justifyContent="flex-end">
                                        <Button
                                           size="small"
                                           startIcon={<Edit />}
-                                          onClick={() => openEditDialog(category)}
+                                          onClick={() => openEditDialog(ageGroup)}
                                           type="button"
                                        >
                                           Edit
@@ -327,7 +351,7 @@ export function CategoriesPage() {
                                           size="small"
                                           color="error"
                                           startIcon={<Delete />}
-                                          onClick={() => setDeleteTarget(category)}
+                                          onClick={() => setDeleteTarget(ageGroup)}
                                           type="button"
                                        >
                                           Delete
@@ -358,32 +382,33 @@ export function CategoriesPage() {
                      <Add sx={{ fontSize: 32, color: "primary.main" }} />
                   </Box>
                   <Typography variant="h6" color="text.secondary" gutterBottom>
-                     No categories yet
+                     No age groups yet
                   </Typography>
                   <Typography variant="body2" color="text.disabled" sx={{ mb: 3 }}>
-                     Start organizing your books by creating your first category.
+                     Create age groups to organize books by reading level.
                   </Typography>
                   <Button
                      variant="contained"
                      startIcon={<Add />}
                      onClick={() =>
-                        window.dispatchEvent(new Event(OPEN_CATEGORY_DIALOG_EVENT))
+                        window.dispatchEvent(new Event(OPEN_AGE_GROUP_DIALOG_EVENT))
                      }
                      type="button"
                   >
-                     Add New Category
+                     Add New Age Group
                   </Button>
                </Card>
             )}
          </Stack>
 
          <Dialog open={Boolean(editTarget)} onClose={() => setEditTarget(null)} fullWidth maxWidth="sm">
-            <DialogTitle>Edit Category</DialogTitle>
+            <DialogTitle>Edit Age Group</DialogTitle>
             <DialogContent dividers>
                <Stack spacing={2} sx={{ pt: 1 }}>
                   {formError && <Alert severity="error">{formError}</Alert>}
+
                   <TextField
-                     label="Category Name"
+                     label="Name"
                      required
                      fullWidth
                      value={editForm.name}
@@ -391,6 +416,30 @@ export function CategoriesPage() {
                         setEditForm((prev) => ({ ...prev, name: event.target.value }))
                      }
                   />
+
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                     <TextField
+                        label="Min Age"
+                        type="number"
+                        fullWidth
+                        inputProps={{ min: 0 }}
+                        value={editForm.minAge}
+                        onChange={(event) =>
+                           setEditForm((prev) => ({ ...prev, minAge: event.target.value }))
+                        }
+                     />
+                     <TextField
+                        label="Max Age"
+                        type="number"
+                        fullWidth
+                        inputProps={{ min: 0 }}
+                        value={editForm.maxAge}
+                        onChange={(event) =>
+                           setEditForm((prev) => ({ ...prev, maxAge: event.target.value }))
+                        }
+                     />
+                  </Stack>
+
                   <TextField
                      label="Description"
                      fullWidth
@@ -398,12 +447,10 @@ export function CategoriesPage() {
                      minRows={3}
                      value={editForm.description}
                      onChange={(event) =>
-                        setEditForm((prev) => ({
-                           ...prev,
-                           description: event.target.value,
-                        }))
+                        setEditForm((prev) => ({ ...prev, description: event.target.value }))
                      }
                   />
+
                   <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                      <TextField
                         label="Sort Order"
@@ -412,16 +459,13 @@ export function CategoriesPage() {
                         inputProps={{ min: 0 }}
                         value={editForm.sortOrder}
                         onChange={(event) =>
-                           setEditForm((prev) => ({
-                              ...prev,
-                              sortOrder: event.target.value,
-                           }))
+                           setEditForm((prev) => ({ ...prev, sortOrder: event.target.value }))
                         }
                      />
                      <FormControl fullWidth>
-                        <InputLabel id="category-status-edit-label">Status</InputLabel>
+                        <InputLabel id="age-group-status-edit-label">Status</InputLabel>
                         <Select
-                           labelId="category-status-edit-label"
+                           labelId="age-group-status-edit-label"
                            label="Status"
                            value={editForm.isActive ? "active" : "inactive"}
                            onChange={(event) =>
@@ -442,21 +486,17 @@ export function CategoriesPage() {
                <Button onClick={() => setEditTarget(null)} disabled={isSubmitting}>
                   Cancel
                </Button>
-               <Button
-                  variant="contained"
-                  onClick={handleSaveEdit}
-                  disabled={isSubmitting}
-               >
+               <Button variant="contained" onClick={handleSaveEdit} disabled={isSubmitting}>
                   {isSubmitting ? "Saving..." : "Save Changes"}
                </Button>
             </DialogActions>
          </Dialog>
 
          <Dialog open={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)}>
-            <DialogTitle>Delete Category</DialogTitle>
+            <DialogTitle>Delete Age Group</DialogTitle>
             <DialogContent>
                <Typography variant="body2" color="text.secondary">
-                  {`Are you sure you want to delete "${deleteTarget?.name || "this category"}"?`}
+                  {`Are you sure you want to delete "${deleteTarget?.name || "this age group"}"?`}
                </Typography>
             </DialogContent>
             <DialogActions>
@@ -464,8 +504,8 @@ export function CategoriesPage() {
                   Cancel
                </Button>
                <Button
-                  color="error"
                   variant="contained"
+                  color="error"
                   onClick={handleDelete}
                   disabled={isDeleting}
                >

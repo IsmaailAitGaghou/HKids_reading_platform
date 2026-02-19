@@ -1,7 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/context/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { PublicRoute } from "@/components/auth/PublicRoute";
 import { AdminLayout } from "@/layouts/AdminLayout";
+import { ParentLayout } from "@/layouts/ParentLayout";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { RegisterPage } from "@/pages/auth/RegisterPage";
 import { ChildLoginPage } from "@/pages/auth/ChildLoginPage";
@@ -10,6 +12,7 @@ import { CategoriesPage } from "@/pages/admin/CategoriesPage";
 import { AgeGroupsPage } from "@/pages/admin/AgeGroupsPage";
 import { AdminBookCreatePage } from "@/pages/admin/AdminBookCreatePage";
 import { ParentDashboard } from "@/pages/parent/ParentDashboard";
+import { ParentChildPage } from "@/pages/parent/ParentChildPage";
 import { KidsLibrary } from "@/pages/kids/KidsLibrary";
 import { ROUTES, ROLES } from "@/utils/constants";
 
@@ -19,9 +22,30 @@ export function AppRouter() {
          <AuthProvider>
             <Routes>
                {/* Public Routes */}
-               <Route path={ROUTES.LOGIN} element={<LoginPage />} />
-               <Route path={ROUTES.REGISTER} element={<RegisterPage />} />
-               <Route path={ROUTES.CHILD_LOGIN} element={<ChildLoginPage />} />
+               <Route
+                  path={ROUTES.LOGIN}
+                  element={
+                     <PublicRoute>
+                        <LoginPage />
+                     </PublicRoute>
+                  }
+               />
+               <Route
+                  path={ROUTES.REGISTER}
+                  element={
+                     <PublicRoute>
+                        <RegisterPage />
+                     </PublicRoute>
+                  }
+               />
+               <Route
+                  path={ROUTES.CHILD_LOGIN}
+                  element={
+                     <PublicRoute>
+                        <ChildLoginPage />
+                     </PublicRoute>
+                  }
+               />
 
                {/* Admin Routes */}
                <Route
@@ -77,13 +101,26 @@ export function AppRouter() {
 
                {/* Parent Routes */}
                <Route
-                  path={ROUTES.PARENT.DASHBOARD}
+                  path={ROUTES.PARENT.PORTAL}
                   element={
                      <ProtectedRoute allowedRoles={[ROLES.PARENT]}>
-                        <ParentDashboard />
+                        <ParentLayout>
+                           <ParentDashboard />
+                        </ParentLayout>
                      </ProtectedRoute>
                   }
                />
+               <Route
+                  path={ROUTES.PARENT.CHILD_VIEW(":id")}
+                  element={
+                     <ProtectedRoute allowedRoles={[ROLES.PARENT]}>
+                        <ParentLayout>
+                           <ParentChildPage />
+                        </ParentLayout>
+                     </ProtectedRoute>
+                  }
+               />
+               <Route path="/parent/dashboard" element={<Navigate to={ROUTES.PARENT.PORTAL} replace />} />
 
                {/* Kids Routes */}
                <Route

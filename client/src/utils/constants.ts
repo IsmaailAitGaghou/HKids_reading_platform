@@ -1,5 +1,5 @@
 // API Configuration
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api/v1';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
 // User Roles
 export const ROLES = {
@@ -99,7 +99,8 @@ export const ROUTES = {
   
   // Parent
   PARENT: {
-    DASHBOARD: '/parent/dashboard',
+    PORTAL: '/parent/portal',
+    DASHBOARD: '/parent/portal',
     CHILDREN: '/parent/children',
     CHILD_CREATE: '/parent/children/create',
     CHILD_EDIT: (id: string) => `/parent/children/${id}/edit`,

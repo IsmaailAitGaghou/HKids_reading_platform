@@ -1,97 +1,70 @@
-// Child Management Types
-export interface ChildProfile {
+export interface Child {
   id: string;
-  name: string;
-  email: string;
-  pin: string;
-  avatar?: string;
-  dateOfBirth?: string;
   parentId: string;
-  createdAt: string;
-  updatedAt: string;
+  name: string;
+  age: number;
+  avatar: string;
+  ageGroupId: string | null;
+  isActive: boolean;
 }
 
 export interface CreateChildRequest {
   name: string;
-  email: string;
-  pin: string;
+  age: number;
   avatar?: string;
-  dateOfBirth?: string;
+  ageGroupId?: string;
+  pin?: string;
 }
 
 export interface UpdateChildRequest {
   name?: string;
-  email?: string;
-  pin?: string;
+  age?: number;
   avatar?: string;
-  dateOfBirth?: string;
+  ageGroupId?: string;
+  pin?: string;
+  isActive?: boolean;
 }
 
-// Child Policy Types
-export interface ChildPolicy {
-  id: string;
+export interface Policy {
   childId: string;
   allowedCategoryIds: string[];
   allowedAgeGroupIds: string[];
-  dailyLimitMinutes?: number;
-  scheduleStart?: string; // HH:mm format
-  scheduleEnd?: string; // HH:mm format
-  createdAt: string;
-  updatedAt: string;
+  dailyLimitMinutes: number;
+  schedule: {
+    start: string;
+    end: string;
+  } | null;
 }
 
 export interface UpdatePolicyRequest {
   allowedCategoryIds?: string[];
   allowedAgeGroupIds?: string[];
   dailyLimitMinutes?: number;
-  scheduleStart?: string;
-  scheduleEnd?: string;
+  schedule?: {
+    start: string;
+    end: string;
+  };
 }
 
-// Child Analytics Types
-export interface ChildAnalytics {
-  childId: string;
-  childName: string;
-  period: {
-    startDate: string;
-    endDate: string;
-  };
+export interface ParentAnalyticsTopBook {
+  bookId: string;
+  sessions: number;
+  minutes: number;
+}
+
+export interface ParentAnalytics {
   totalSessions: number;
   totalMinutes: number;
-  totalBooksRead: number;
-  averageSessionMinutes: number;
-  dailyActivity: DailyActivity[];
-  topBooks: TopBook[];
-  categoryDistribution: CategoryDistribution[];
+  lastReadAt: string | null;
+  topBooks: ParentAnalyticsTopBook[];
 }
 
-export interface DailyActivity {
-  date: string;
-  sessions: number;
-  minutes: number;
-  booksRead: number;
+export interface ChildAnalyticsResponse {
+  child: Child;
+  analytics: ParentAnalytics;
 }
 
-export interface TopBook {
-  bookId: string;
-  bookTitle: string;
-  coverImage: string;
-  sessions: number;
-  totalMinutes: number;
-  completionPercentage: number;
-}
-
-export interface CategoryDistribution {
-  categoryId: string;
-  categoryName: string;
-  sessions: number;
-  minutes: number;
-  percentage: number;
-}
-
-// Analytics Query
 export interface AnalyticsQuery {
-  startDate?: string;
-  endDate?: string;
-  groupBy?: 'day' | 'week' | 'month';
+  from?: string;
+  to?: string;
 }

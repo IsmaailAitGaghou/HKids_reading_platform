@@ -47,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         navigate(ROUTES.ADMIN.DASHBOARD);
         break;
       case ROLES.PARENT:
-        navigate(ROUTES.PARENT.DASHBOARD);
+        navigate(ROUTES.PARENT.PORTAL);
         break;
       case ROLES.CHILD:
         navigate(ROUTES.KIDS.LIBRARY);

@@ -50,7 +50,7 @@ function getDefaultRouteForRole(role: Role): string {
     case 'ADMIN':
       return ROUTES.ADMIN.DASHBOARD;
     case 'PARENT':
-      return ROUTES.PARENT.DASHBOARD;
+      return ROUTES.PARENT.PORTAL;
     case 'CHILD':
       return ROUTES.KIDS.LIBRARY;
     default:

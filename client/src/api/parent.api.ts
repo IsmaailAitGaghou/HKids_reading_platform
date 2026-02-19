@@ -1,95 +1,81 @@
-import { API_ENDPOINTS } from '@/utils/constants';
-import { get, post, patch, del } from '@/api/client';
+import { API_ENDPOINTS } from "@/utils/constants";
+import { del, get, patch, post } from "@/api/client";
 import type {
-  ChildProfile,
-  CreateChildRequest,
-  UpdateChildRequest,
-  ChildPolicy,
-  UpdatePolicyRequest,
-  ChildAnalytics,
   AnalyticsQuery,
-} from '@/types/child.types';
+  Child,
+  ChildAnalyticsResponse,
+  CreateChildRequest,
+  Policy,
+  UpdateChildRequest,
+  UpdatePolicyRequest,
+} from "@/types/child.types";
 
-/**
- * List all children for the authenticated parent
- */
-export const listChildren = async (): Promise<ChildProfile[]> => {
-  const response = await get<ChildProfile[]>(API_ENDPOINTS.PARENT.CHILDREN);
-  return response.data;
+interface ChildrenResponse {
+  total: number;
+  children: Child[];
+}
+
+interface ChildResponse {
+  child: Child;
+}
+
+interface PolicyResponse {
+  policy: Policy;
+}
+
+export const listChildren = async (): Promise<ChildrenResponse> => {
+  return get<ChildrenResponse>(API_ENDPOINTS.PARENT.CHILDREN);
 };
 
-/**
- * Get a single child by ID
- */
-export const getChildById = async (id: string): Promise<ChildProfile> => {
-  const response = await get<ChildProfile>(API_ENDPOINTS.PARENT.CHILD_BY_ID(id));
-  return response.data;
+export const getChildById = async (id: string): Promise<Child> => {
+  const response = await get<ChildResponse>(API_ENDPOINTS.PARENT.CHILD_BY_ID(id));
+  return response.child;
 };
 
-/**
- * Create a new child profile
- */
-export const createChild = async (data: CreateChildRequest): Promise<ChildProfile> => {
-  const response = await post<ChildProfile, CreateChildRequest>(
+export const createChild = async (data: CreateChildRequest): Promise<Child> => {
+  const response = await post<{ child: Child }, CreateChildRequest>(
     API_ENDPOINTS.PARENT.CHILDREN,
     data
   );
-  return response.data;
+  return response.child;
 };
 
-/**
- * Update a child profile
- */
 export const updateChild = async (
   id: string,
   data: UpdateChildRequest
-): Promise<ChildProfile> => {
-  const response = await patch<ChildProfile, UpdateChildRequest>(
+): Promise<Child> => {
+  const response = await patch<{ child: Child }, UpdateChildRequest>(
     API_ENDPOINTS.PARENT.CHILD_BY_ID(id),
     data
   );
-  return response.data;
+  return response.child;
 };
 
-/**
- * Delete a child profile
- */
 export const deleteChild = async (id: string): Promise<void> => {
   await del(API_ENDPOINTS.PARENT.CHILD_BY_ID(id));
 };
 
-/**
- * Get child's policy (reading restrictions)
- */
-export const getChildPolicy = async (id: string): Promise<ChildPolicy> => {
-  const response = await get<ChildPolicy>(API_ENDPOINTS.PARENT.CHILD_POLICY(id));
-  return response.data;
+export const getChildPolicy = async (id: string): Promise<Policy> => {
+  const response = await get<PolicyResponse>(API_ENDPOINTS.PARENT.CHILD_POLICY(id));
+  return response.policy;
 };
 
-/**
- * Update child's policy
- */
 export const updateChildPolicy = async (
   id: string,
   data: UpdatePolicyRequest
-): Promise<ChildPolicy> => {
-  const response = await patch<ChildPolicy, UpdatePolicyRequest>(
+): Promise<Policy> => {
+  const response = await patch<PolicyResponse, UpdatePolicyRequest>(
     API_ENDPOINTS.PARENT.CHILD_POLICY(id),
     data
   );
-  return response.data;
+  return response.policy;
 };
 
-/**
- * Get child's reading analytics
- */
 export const getChildAnalytics = async (
   id: string,
   query?: AnalyticsQuery
-): Promise<ChildAnalytics> => {
-  const response = await get<ChildAnalytics>(
-    API_ENDPOINTS.PARENT.CHILD_ANALYTICS(id),
-    { params: query }
-  );
-  return response.data;
+): Promise<ChildAnalyticsResponse> => {
+  return get<ChildAnalyticsResponse>(API_ENDPOINTS.PARENT.CHILD_ANALYTICS(id), {
+    params: query,
+  });
 };

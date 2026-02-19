@@ -38,6 +38,10 @@ export const listAgeGroups = async (): Promise<AgeGroupsResponse> => {
    return get<AgeGroupsResponse>(API_ENDPOINTS.AGE_GROUPS.BASE);
 };
 
+export const listPublicAgeGroups = async (): Promise<AgeGroupsResponse> => {
+   return get<AgeGroupsResponse>(API_ENDPOINTS.AGE_GROUPS.PUBLIC);
+};
+
 export const createAgeGroup = async (
    data: CreateAgeGroupRequest
 ): Promise<AgeGroup> => {

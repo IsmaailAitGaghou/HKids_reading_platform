@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
    Alert,
    Box,
@@ -16,16 +16,19 @@ import {
    TextField,
    Typography,
 } from "@mui/material";
-import { Add, ArrowBack, DeleteOutline } from "@mui/icons-material";
+import { Add, ArrowBack, DeleteOutline, PictureAsPdf } from "@mui/icons-material";
 import { useNavigate, useParams } from "react-router-dom";
+import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
 import { createBook, getBookById, updateBook } from "@/api/books.api";
 import { listCategories } from "@/api/categories.api";
 import { listAgeGroups } from "@/api/ageGroups.api";
 import { uploadImage } from "@/api/uploads.api";
 import { ROUTES } from "@/utils/constants";
+import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
 const BOOK_CREATED_EVENT = "admin:book-created";
 const BOOK_UPDATED_EVENT = "admin:book-updated";
+GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 
 type SnackbarSeverity = "success" | "error" | "info" | "warning";
 
@@ -86,6 +89,11 @@ export function AdminBookCreatePage() {
    const [coverImageFile, setCoverImageFile] = useState<File | null>(null);
    const [coverPreview, setCoverPreview] = useState("");
    const [coverUploadProgress, setCoverUploadProgress] = useState(0);
+   const [isImportingPdf, setIsImportingPdf] = useState(false);
+   const [pdfImportProgress, setPdfImportProgress] = useState<{
+      current: number;
+      total: number;
+   } | null>(null);
 
    const [pages, setPages] = useState<PageDraft[]>([createEmptyPage(1)]);
 
@@ -256,6 +264,78 @@ export function AdminBookCreatePage() {
       }
    };
 
+   const clearReplacedPreviews = useCallback((currentPages: PageDraft[], nextPages: PageDraft[]) => {
+      const nextIds = new Set(nextPages.map((page) => page.id));
+      currentPages.forEach((page) => {
+         if (!nextIds.has(page.id)) {
+            revokePreview(page.imagePreview);
+         }
+      });
+   }, []);
+
+   const replacePages = useCallback((nextPages: PageDraft[]) => {
+      setPages((currentPages) => {
+         clearReplacedPreviews(currentPages, nextPages);
+         return nextPages.length ? nextPages : [createEmptyPage(1)];
+      });
+   }, [clearReplacedPreviews]);
+
+   const parsePdfToPages = async (file: File): Promise<PageDraft[]> => {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdfDocument = await getDocument({ data: arrayBuffer }).promise;
+      const importedPages: PageDraft[] = [];
+      const safeBaseName = file.name.replace(/\.pdf$/i, "").replace(/\s+/g, "-");
+
+      for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber += 1) {
+         setPdfImportProgress({ current: pageNumber, total: pdfDocument.numPages });
+
+         const pdfPage = await pdfDocument.getPage(pageNumber);
+         const viewport = pdfPage.getViewport({ scale: 1.8 });
+
+         const canvas = document.createElement("canvas");
+         const context = canvas.getContext("2d");
+         if (!context) {
+            throw new Error("Failed to prepare PDF canvas renderer.");
+         }
+
+         canvas.width = Math.floor(viewport.width);
+         canvas.height = Math.floor(viewport.height);
+         await pdfPage.render({ canvasContext: context, viewport }).promise;
+
+         const pageBlob = await new Promise<Blob>((resolve, reject) => {
+            canvas.toBlob(
+               (blob) => {
+                  if (!blob) {
+                     reject(new Error("Failed to convert PDF page to image."));
+                     return;
+                  }
+                  resolve(blob);
+               },
+               "image/jpeg",
+               0.92
+            );
+         });
+
+         const imageFile = new File([pageBlob], `${safeBaseName}-page-${pageNumber}.jpg`, {
+            type: "image/jpeg",
+         });
+
+         importedPages.push({
+            id: `${Date.now()}-${pageNumber}-${Math.random()}`,
+            pageNumber: String(pageNumber),
+            title: `Page ${pageNumber}`,
+            text: "",
+            narrationUrl: "",
+            imageFile,
+            imagePreview: URL.createObjectURL(imageFile),
+            existingImageUrl: "",
+            uploadProgress: 0,
+         });
+      }
+
+      return importedPages;
+   };
+
    const handleCoverFileChange = (file: File | null) => {
       if (!file) return;
       revokePreview(coverPreview);
@@ -277,6 +357,51 @@ export function AdminBookCreatePage() {
             };
          })
       );
+   };
+
+   const handlePdfImport = async (file: File | null) => {
+      if (!file) return;
+
+      const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+      if (!isPdf) {
+         setSnackbar({
+            open: true,
+            severity: "error",
+            message: "Please select a valid PDF file.",
+         });
+         return;
+      }
+
+      try {
+         setIsImportingPdf(true);
+         setPdfImportProgress(null);
+         const importedPages = await parsePdfToPages(file);
+
+         if (!importedPages.length) {
+            setSnackbar({
+               open: true,
+               severity: "error",
+               message: "No pages were detected in this PDF.",
+            });
+            return;
+         }
+
+         replacePages(importedPages);
+         setSnackbar({
+            open: true,
+            severity: "success",
+            message: `Imported ${importedPages.length} page(s) from PDF.`,
+         });
+      } catch (err) {
+         setSnackbar({
+            open: true,
+            severity: "error",
+            message: getErrorMessage(err, "Failed to import PDF pages."),
+         });
+      } finally {
+         setIsImportingPdf(false);
+         setPdfImportProgress(null);
+      }
    };
 
    const handleAddPage = () => {
@@ -603,14 +728,56 @@ export function AdminBookCreatePage() {
                               </Select>
                            </FormControl>
 
-                           <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ pt: 1 }}>
+                           <Stack
+                              direction={{ xs: "column", sm: "row" }}
+                              alignItems={{ xs: "flex-start", sm: "center" }}
+                              justifyContent="space-between"
+                              sx={{ pt: 1 }}
+                              spacing={1}
+                           >
                               <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
                                  Pages
                               </Typography>
-                              <Button startIcon={<Add />} onClick={handleAddPage} type="button">
-                                 Add Page
-                              </Button>
+                              <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
+                                 <Button
+                                    startIcon={<PictureAsPdf />}
+                                    variant="outlined"
+                                    component="label"
+                                    disabled={isImportingPdf || isSubmitting}
+                                    type="button"
+                                 >
+                                    {isImportingPdf ? "Importing PDF..." : "Import PDF"}
+                                    <input
+                                       hidden
+                                       type="file"
+                                       accept=".pdf,application/pdf"
+                                       onChange={(event) => {
+                                          void handlePdfImport(event.target.files?.[0] || null);
+                                          event.currentTarget.value = "";
+                                       }}
+                                    />
+                                 </Button>
+                                 <Button
+                                    startIcon={<Add />}
+                                    onClick={handleAddPage}
+                                    type="button"
+                                    disabled={isImportingPdf || isSubmitting}
+                                 >
+                                    Add Page
+                                 </Button>
+                              </Stack>
                            </Stack>
+
+                           {isImportingPdf && (
+                              <Stack direction="row" spacing={1} alignItems="center">
+                                 <CircularProgress size={16} />
+                                 <Typography variant="caption" color="text.secondary">
+                                    {pdfImportProgress
+                                       ? `Rendering PDF page ${pdfImportProgress.current} of ${pdfImportProgress.total}...`
+                                       : "Preparing PDF import..."}
+                                 </Typography>
+                              </Stack>
+                           )}
 
                            {pages.map((page, index) => (
                               <Card key={page.id} variant="outlined" sx={{ borderRadius: 2 }}>

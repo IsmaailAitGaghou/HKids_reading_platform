@@ -38,6 +38,8 @@ export const bookIdParamsSchema = z.object({
 });
 
 export const adminBooksQuerySchema = z.object({
+  ageGroupId: z.string().regex(objectIdRegex).optional(),
+  categoryId: z.string().regex(objectIdRegex).optional(),
   status: z.enum(["draft", "published", "archived"]).optional(),
   visibility: z.enum(["private", "public"]).optional(),
   approved: z

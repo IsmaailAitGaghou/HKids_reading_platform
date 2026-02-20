@@ -13,6 +13,7 @@ import {
 } from "../children/children.service";
 import { ChildPolicyModel } from "../children/child-policy.model";
 import { ReadingSessionModel } from "../children/reading-session.model";
+import { BookModel } from "../books/book.model";
 
 const sanitizeChild = (child: {
   _id: unknown;
@@ -245,6 +246,20 @@ export const getChildAnalytics = asyncHandler(async (req: Request, res: Response
   }
 
   const topBooks = [...topBooksMap.values()].sort((a, b) => b.minutes - a.minutes).slice(0, 5);
+  const topBookIds = topBooks.map((book) => new Types.ObjectId(book.bookId));
+  const topBookDocuments =
+    topBookIds.length > 0
+      ? await BookModel.find({ _id: { $in: topBookIds } }).select({ title: 1 }).lean()
+      : [];
+
+  const titleByBookId = new Map(
+    topBookDocuments.map((book) => [String(book._id), book.title])
+  );
+
+  const topBooksWithTitles = topBooks.map((book) => ({
+    ...book,
+    title: titleByBookId.get(book.bookId) ?? "Untitled Book"
+  }));
 
   res.status(200).json({
     child: sanitizeChild(child),
@@ -252,7 +267,7 @@ export const getChildAnalytics = asyncHandler(async (req: Request, res: Response
       totalSessions,
       totalMinutes,
       lastReadAt,
-      topBooks
+      topBooks: topBooksWithTitles
     }
   });
 });

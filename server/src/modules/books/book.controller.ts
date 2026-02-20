@@ -108,6 +108,8 @@ export const createBook = asyncHandler(async (req: Request, res: Response) => {
 
 export const listAdminBooks = asyncHandler(async (req: Request, res: Response) => {
   const query = req.query as {
+    ageGroupId?: string;
+    categoryId?: string;
     status?: "draft" | "published" | "archived";
     visibility?: "private" | "public";
     approved?: boolean;
@@ -115,6 +117,8 @@ export const listAdminBooks = asyncHandler(async (req: Request, res: Response) =
   };
 
   const filter: Record<string, unknown> = {};
+  if (query.ageGroupId) filter.ageGroupId = new Types.ObjectId(query.ageGroupId);
+  if (query.categoryId) filter.categoryIds = new Types.ObjectId(query.categoryId);
   if (query.status) filter.status = query.status;
   if (query.visibility) filter.visibility = query.visibility;
   if (typeof query.approved === "boolean") filter.isApproved = query.approved;
@@ -194,6 +198,10 @@ export const updateBook = asyncHandler(async (req: Request, res: Response) => {
   if (body.status) {
     book.status = body.status;
     if (body.status === "published") {
+      if (!book.pages.length) {
+        throw new HttpError(400, "Book must have at least one page before publishing");
+      }
+      book.isApproved = true;
       book.publishedAt = new Date();
     }
   }
@@ -268,13 +276,12 @@ export const publishBook = asyncHandler(async (req: Request, res: Response) => {
     throw new HttpError(404, "Book not found");
   }
 
-  if (!book.isApproved) {
-    throw new HttpError(400, "Book must be approved before publishing");
-  }
   if (!book.pages.length) {
     throw new HttpError(400, "Book must have at least one page before publishing");
   }
 
+  // Publish action is admin-only, so approval is applied automatically here.
+  book.isApproved = true;
   book.status = "published";
   book.publishedAt = new Date();
   await book.save();

@@ -1,5 +1,5 @@
 import { z as zod } from "zod";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link as RouterLink, useSearchParams } from "react-router-dom";
@@ -23,8 +23,8 @@ const ChildLoginSchema = zod.object({
    childId: zod.string().min(1, { message: "Child ID is required" }),
    pin: zod
       .string()
-      .min(4, { message: "PIN must be 4 digits" })
-      .max(4, { message: "PIN must be 4 digits" })
+      .min(4, { message: "PIN must be 4 to 8 digits" })
+      .max(8, { message: "PIN must be 4 to 8 digits" })
       .regex(/^\d+$/, { message: "PIN must contain only numbers" }),
 });
 
@@ -41,6 +41,7 @@ export function ChildLoginPage() {
    const {
       register,
       handleSubmit,
+      setValue,
       formState: { errors, isSubmitting },
    } = useForm<ChildLoginSchemaType>({
       resolver: zodResolver(ChildLoginSchema),
@@ -49,6 +50,12 @@ export function ChildLoginPage() {
          pin: "",
       },
    });
+
+   useEffect(() => {
+      if (urlChildId) {
+         setValue("childId", urlChildId);
+      }
+   }, [urlChildId, setValue]);
 
    const onSubmit = async (data: ChildLoginSchemaType) => {
       try {
@@ -117,7 +124,7 @@ export function ChildLoginPage() {
                         color="text.secondary"
                         sx={{ textAlign: "center", maxWidth: 360 }}
                      >
-                        Enter your 4-digit PIN to continue reading
+                        Enter your PIN to continue reading
                      </Typography>
                   </Stack>
 
@@ -158,7 +165,7 @@ export function ChildLoginPage() {
                               {...register("pin")}
                               type="text"
                               inputMode="numeric"
-                              maxLength={4}
+                              maxLength={8}
                               placeholder="Enter PIN"
                               style={{
                                  width: "100%",

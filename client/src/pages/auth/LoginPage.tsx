@@ -179,50 +179,9 @@ export function LoginPage() {
               {renderForm()}
             </Form>
 
-            {/* Divider */}
-            <Box sx={{ position: 'relative', textAlign: 'center', my: 2 }}>
-              <Box
-                sx={{
-                  position: 'absolute',
-                  top: '50%',
-                  left: 0,
-                  right: 0,
-                  height: '1px',
-                  backgroundColor: 'divider',
-                }}
-              />
-              <Box
-                component="span"
-                sx={{
-                  position: 'relative',
-                  display: 'inline-block',
-                  px: 2,
-                  backgroundColor: 'background.paper',
-                  color: 'text.secondary',
-                  fontSize: '0.875rem',
-                }}
-              >
-                or
-              </Box>
-            </Box>
+            
 
-            {/* Child Login Link */}
-            <Link
-              component={RouterLink}
-              to={ROUTES.CHILD_LOGIN}
-              sx={{
-                display: 'block',
-                textAlign: 'center',
-                color: 'primary.main',
-                textDecoration: 'none',
-                fontWeight: 500,
-                '&:hover': {
-                  textDecoration: 'underline',
-                },
-              }}
-            >
-              Sign in as Child with PIN
-            </Link>
+            
           </Stack>
         </Card>
       </Container>

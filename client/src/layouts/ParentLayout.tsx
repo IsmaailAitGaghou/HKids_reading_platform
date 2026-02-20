@@ -76,6 +76,11 @@ export function ParentLayout({ children }: ParentLayoutProps) {
           navigate(ROUTES.PARENT.PORTAL);
         }}
         onOpenChild={(id) => navigate(ROUTES.PARENT.CHILD_VIEW(id))}
+        onOpenChildLogin={() => {
+          const targetChildId = activeChildId || childrenProfiles[0]?.id;
+          if (!targetChildId) return;
+          navigate(`${ROUTES.CHILD_LOGIN}?childId=${encodeURIComponent(targetChildId)}`);
+        }}
         onLogout={logout}
       />
 

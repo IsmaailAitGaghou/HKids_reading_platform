@@ -1,7 +1,7 @@
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { Box, CircularProgress } from "@mui/material";
 import { useAuthContext } from "@/context/useAuthContext";
-import { ROUTES, type Role } from "@/utils/constants";
+import { ROUTES, ROLES, type Role } from "@/utils/constants";
 
 interface PublicRouteProps {
   children: React.ReactNode;
@@ -22,6 +22,7 @@ function getDefaultRouteForRole(role: Role): string {
 
 export function PublicRoute({ children }: PublicRouteProps) {
   const { user, isLoading, isAuthenticated } = useAuthContext();
+  const location = useLocation();
 
   if (isLoading) {
     return (
@@ -40,6 +41,13 @@ export function PublicRoute({ children }: PublicRouteProps) {
   }
 
   if (isAuthenticated && user) {
+    const isParentOpeningChildLogin =
+      location.pathname === ROUTES.CHILD_LOGIN && user.role === ROLES.PARENT;
+
+    if (isParentOpeningChildLogin) {
+      return <>{children}</>;
+    }
+
     return <Navigate to={getDefaultRouteForRole(user.role)} replace />;
   }
 

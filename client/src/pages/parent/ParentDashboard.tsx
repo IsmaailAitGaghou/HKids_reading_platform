@@ -26,7 +26,17 @@ interface ActivityPoint {
   minutes: number;
 }
 
-const formatDate = (value: Date) => value.toISOString().slice(0, 10);
+const toDayStartIso = (value: Date) => {
+  const date = new Date(value);
+  date.setHours(0, 0, 0, 0);
+  return date.toISOString();
+};
+
+const toDayEndIso = (value: Date) => {
+  const date = new Date(value);
+  date.setHours(23, 59, 59, 999);
+  return date.toISOString();
+};
 
 const getLastSevenDates = () => {
   const dates: Date[] = [];
@@ -106,17 +116,16 @@ export function ParentDashboard() {
         setError(null);
 
         const days = getLastSevenDates();
-        const from = formatDate(days[0]);
-        const to = formatDate(days[days.length - 1]);
+        const from = toDayStartIso(days[0]);
+        const to = toDayEndIso(days[days.length - 1]);
 
         const [summaryResponse, dayResponses] = await Promise.all([
           getChildAnalytics(selectedChildId, { from, to }),
           Promise.all(
             days.map(async (day) => {
-              const dayKey = formatDate(day);
               const response = await getChildAnalytics(selectedChildId, {
-                from: dayKey,
-                to: dayKey,
+                from: toDayStartIso(day),
+                to: toDayEndIso(day),
               });
               return {
                 label: toWeekdayLabel(day),

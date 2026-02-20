@@ -102,18 +102,39 @@ export interface BookFilters {
 export interface KidsBook {
   id: string;
   title: string;
-  author: string;
-  description: string;
-  coverImage: string;
-  totalPages: number;
-  lastReadPage?: number;
-  progressPercentage?: number;
+  summary: string;
+  coverImageUrl: string;
+  pageCount: number;
+}
+
+export interface KidsBooksResponse {
+  total: number;
+  remainingMinutes: number;
+  books: KidsBook[];
+}
+
+export interface KidsBookResponse {
+  book: KidsBook;
+}
+
+export interface KidsBookPagesResponse {
+  book: {
+    id: string;
+    title: string;
+    summary: string;
+    pageCount: number;
+  };
+  pages: BookPage[];
 }
 
 export interface BookResumeData {
-  bookId: string;
-  lastPageNumber: number;
-  lastReadAt: string;
-  progressPercentage: number;
-  totalTimeMinutes: number;
+  hasProgress: boolean;
+  pageIndex: number;
+  sessionId: string | null;
+  hasActiveSession: boolean;
+  lastActivityAt: string | null;
+}
+
+export interface KidsBookResumeResponse {
+  resume: BookResumeData;
 }

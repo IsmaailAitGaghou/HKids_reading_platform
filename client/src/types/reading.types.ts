@@ -22,31 +22,40 @@ export interface ProgressEvent {
 // Reading API Requests
 export interface StartReadingRequest {
   bookId: string;
-  startPage?: number;
 }
 
 export interface StartReadingResponse {
-  sessionId: string;
-  bookId: string;
-  startTime: string;
-  startPage: number;
-  remainingMinutesToday?: number;
+  message: string;
+  session: {
+    id: string;
+    childId: string;
+    bookId: string;
+    startedAt: string;
+    resumePageIndex: number;
+    resumed: boolean;
+  };
 }
 
 export interface TrackProgressRequest {
   sessionId: string;
-  pageNumber: number;
-  action: 'view' | 'complete';
+  pageIndex: number;
 }
 
 export interface EndReadingRequest {
   sessionId: string;
-  endPage: number;
 }
 
 export interface EndReadingResponse {
-  sessionId: string;
-  totalMinutes: number;
-  pagesRead: number;
-  completionPercentage: number;
+  message: string;
+  session: {
+    id: string;
+    minutes: number;
+    pagesRead: number;
+    endedAt: string;
+  };
+  limits: {
+    dailyLimitMinutes: number;
+    consumedTodayMinutes: number;
+    remainingMinutes: number;
+  };
 }

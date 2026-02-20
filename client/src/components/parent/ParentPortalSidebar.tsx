@@ -11,11 +11,9 @@ import {
   Typography,
 } from "@mui/material";
 import {
-  CreditCard,
   Dashboard,
+  Login,
   Logout,
-  Security,
-  Settings,
   SupervisedUserCircle,
   MenuBook,
   CheckCircle,
@@ -29,15 +27,13 @@ interface ParentPortalSidebarProps {
   onOpenDashboard: () => void;
   onOpenProfiles: () => void;
   onOpenChild: (id: string) => void;
+  onOpenChildLogin: () => void;
   onLogout: () => void;
 }
 
 const mainMenu = [
   { label: "Dashboard", icon: <Dashboard />, key: "dashboard" },
   { label: "Child Profiles", icon: <SupervisedUserCircle />, key: "profiles" },
-  { label: "Account Settings", icon: <Settings />, key: "account" },
-  { label: "Security", icon: <Security />, key: "security" },
-  { label: "Billing", icon: <CreditCard />, key: "billing" },
 ] as const;
 
 export function ParentPortalSidebar({
@@ -47,6 +43,7 @@ export function ParentPortalSidebar({
   onOpenDashboard,
   onOpenProfiles,
   onOpenChild,
+  onOpenChildLogin,
   onLogout,
 }: ParentPortalSidebarProps) {
   return (
@@ -92,11 +89,7 @@ export function ParentPortalSidebar({
         </Stack>
       </Box>
 
-      {/* <Box sx={{ px: 3, pb: 1 }}>
-        <Typography variant="caption" color="text.secondary" sx={{ letterSpacing: "0.09em", fontWeight: 700 }}>
-          MAIN MENU
-        </Typography>
-      </Box> */}
+      
 
       <List sx={{ px: 2, py: 0, mb: 2 }}>
         {mainMenu.map((item) => {
@@ -176,6 +169,18 @@ export function ParentPortalSidebar({
       </Stack>
 
       <Box sx={{ mt: "auto", p: 2 }}>
+        <Button
+          fullWidth
+          variant="contained"
+          startIcon={<Login />}
+          onClick={onOpenChildLogin}
+          type="button"
+          sx={{ py: 1.1, mb: 1 }}
+          disabled={childrenProfiles.length === 0}
+        >
+          Child Login
+        </Button>
+
         <Button
           fullWidth
           variant="outlined"

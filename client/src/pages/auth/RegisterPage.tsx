@@ -12,7 +12,6 @@ import {
   Card,
   Container,
   InputAdornment,
-  MenuItem,
 } from '@mui/material';
 import { LoadingButton } from '@mui/lab';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
@@ -109,7 +108,7 @@ export function RegisterPage() {
         }}
       />
 
-      <Field.Text
+      {/* <Field.Text
         name="role"
         label="Account Type"
         select
@@ -117,7 +116,7 @@ export function RegisterPage() {
       >
         <MenuItem value="PARENT">Parent</MenuItem>
         <MenuItem value="ADMIN">Admin</MenuItem>
-      </Field.Text>
+      </Field.Text> */}
 
       <LoadingButton
         fullWidth

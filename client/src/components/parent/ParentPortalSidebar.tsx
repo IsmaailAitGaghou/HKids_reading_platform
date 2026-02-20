@@ -12,6 +12,7 @@ import {
 } from "@mui/material";
 import {
   Dashboard,
+  ManageAccounts,
   Login,
   Logout,
   SupervisedUserCircle,
@@ -23,9 +24,10 @@ import type { Child } from "@/types/child.types";
 interface ParentPortalSidebarProps {
   childrenProfiles: Child[];
   activeChildId?: string;
-  activeSection: "dashboard" | "profiles";
+  activeSection: "dashboard" | "profiles" | "manage";
   onOpenDashboard: () => void;
   onOpenProfiles: () => void;
+  onOpenManageChildren: () => void;
   onOpenChild: (id: string) => void;
   onOpenChildLogin: () => void;
   onLogout: () => void;
@@ -34,6 +36,7 @@ interface ParentPortalSidebarProps {
 const mainMenu = [
   { label: "Dashboard", icon: <Dashboard />, key: "dashboard" },
   { label: "Child Profiles", icon: <SupervisedUserCircle />, key: "profiles" },
+  { label: "Manage Children", icon: <ManageAccounts />, key: "manage" },
 ] as const;
 
 export function ParentPortalSidebar({
@@ -42,6 +45,7 @@ export function ParentPortalSidebar({
   activeSection,
   onOpenDashboard,
   onOpenProfiles,
+  onOpenManageChildren,
   onOpenChild,
   onOpenChildLogin,
   onLogout,
@@ -95,15 +99,18 @@ export function ParentPortalSidebar({
         {mainMenu.map((item) => {
           const isDashboard = item.key === "dashboard";
           const isProfiles = item.key === "profiles";
+          const isManageChildren = item.key === "manage";
           const selected =
             (isDashboard && activeSection === "dashboard") ||
-            (isProfiles && activeSection === "profiles");
+            (isProfiles && activeSection === "profiles") ||
+            (isManageChildren && activeSection === "manage");
           return (
             <ListItem key={item.key} disablePadding sx={{ mb: 0.6 }}>
               <ListItemButton
                 onClick={() => {
                   if (isDashboard) onOpenDashboard();
                   if (isProfiles) onOpenProfiles();
+                  if (isManageChildren) onOpenManageChildren();
                 }}
                 selected={selected}
                 sx={{

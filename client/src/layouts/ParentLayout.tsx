@@ -25,9 +25,12 @@ export function ParentLayout({ children }: ParentLayoutProps) {
     return match?.[1];
   }, [location.pathname]);
 
-  const activeSection = useMemo<"dashboard" | "profiles">(() => {
+  const activeSection = useMemo<"dashboard" | "profiles" | "manage">(() => {
     if (location.pathname === ROUTES.PARENT.PORTAL) {
       return "dashboard";
+    }
+    if (location.pathname === ROUTES.PARENT.CHILDREN) {
+      return "manage";
     }
     return "profiles";
   }, [location.pathname]);
@@ -73,8 +76,9 @@ export function ParentLayout({ children }: ParentLayoutProps) {
             navigate(ROUTES.PARENT.CHILD_VIEW(fallbackId));
             return;
           }
-          navigate(ROUTES.PARENT.PORTAL);
+          navigate(ROUTES.PARENT.CHILDREN);
         }}
+        onOpenManageChildren={() => navigate(ROUTES.PARENT.CHILDREN)}
         onOpenChild={(id) => navigate(ROUTES.PARENT.CHILD_VIEW(id))}
         onOpenChildLogin={() => {
           const targetChildId = activeChildId || childrenProfiles[0]?.id;

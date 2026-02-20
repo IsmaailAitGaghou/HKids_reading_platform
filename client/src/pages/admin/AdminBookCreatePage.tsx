@@ -300,7 +300,7 @@ export function AdminBookCreatePage() {
 
          canvas.width = Math.floor(viewport.width);
          canvas.height = Math.floor(viewport.height);
-         await pdfPage.render({ canvasContext: context, viewport }).promise;
+         await pdfPage.render({ canvasContext: context, viewport, canvas }).promise;
 
          const pageBlob = await new Promise<Blob>((resolve, reject) => {
             canvas.toBlob(
@@ -744,7 +744,6 @@ export function AdminBookCreatePage() {
                                     variant="outlined"
                                     component="label"
                                     disabled={isImportingPdf || isSubmitting}
-                                    type="button"
                                  >
                                     {isImportingPdf ? "Importing PDF..." : "Import PDF"}
                                     <input

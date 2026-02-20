@@ -13,6 +13,7 @@ import { AgeGroupsPage } from "@/pages/admin/AgeGroupsPage";
 import { AdminBookCreatePage } from "@/pages/admin/AdminBookCreatePage";
 import { ParentDashboard } from "@/pages/parent/ParentDashboard";
 import { ParentChildPage } from "@/pages/parent/ParentChildPage";
+import { ParentChildrenManagePage } from "@/pages/parent/ParentChildrenManagePage";
 import { KidsLibrary } from "@/pages/kids/KidsLibrary";
 import { ROUTES, ROLES } from "@/utils/constants";
 
@@ -106,6 +107,16 @@ export function AppRouter() {
                      <ProtectedRoute allowedRoles={[ROLES.PARENT]}>
                         <ParentLayout>
                            <ParentDashboard />
+                        </ParentLayout>
+                     </ProtectedRoute>
+                  }
+               />
+               <Route
+                  path={ROUTES.PARENT.CHILDREN}
+                  element={
+                     <ProtectedRoute allowedRoles={[ROLES.PARENT]}>
+                        <ParentLayout>
+                           <ParentChildrenManagePage />
                         </ParentLayout>
                      </ProtectedRoute>
                   }

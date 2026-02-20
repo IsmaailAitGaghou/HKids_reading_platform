@@ -54,7 +54,7 @@ export function KidsLibraryHeader({
             {(childName.charAt(0) || "C").toUpperCase()}
           </Avatar>
           <Box>
-            <Typography variant="h6" sx={{ lineHeight: 1.2 }}>
+            <Typography variant="h6" sx={{ lineHeight: 1.2, fontSize: "0.8rem" }}>
               {`${childName}'s Library`}
             </Typography>
             <Typography variant="caption" color="text.secondary">

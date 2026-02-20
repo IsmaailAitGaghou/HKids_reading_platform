@@ -105,11 +105,17 @@ export interface KidsBook {
   summary: string;
   coverImageUrl: string;
   pageCount: number;
+  categoryIds: string[];
 }
 
 export interface KidsBooksResponse {
   total: number;
   remainingMinutes: number;
+  categories: Array<{
+    id: string;
+    name: string;
+    slug: string;
+  }>;
   books: KidsBook[];
 }
 

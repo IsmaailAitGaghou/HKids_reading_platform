@@ -64,7 +64,14 @@ export function ChildLoginPage() {
       } catch (error: unknown) {
          console.error(error);
          const message =
-            error instanceof Error ? error.message : "Invalid PIN or Child ID";
+            typeof error === "object" &&
+            error !== null &&
+            "error" in error &&
+            typeof error.error === "string"
+               ? error.error
+               : error instanceof Error
+                 ? error.message
+                 : "Invalid PIN or Child ID";
          setErrorMessage(message);
       }
    };

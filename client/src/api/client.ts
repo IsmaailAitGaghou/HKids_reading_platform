@@ -9,6 +9,13 @@ import { API_BASE_URL } from '@/utils/constants';
 import { getToken, clearAuthData } from '@/utils/storage';
 import type { ApiError } from '@/types/common.types';
 
+const AUTH_401_BYPASS_PATHS = ['/auth/login', '/auth/child/pin', '/auth/register'];
+
+const shouldBypassAuthRedirect = (url?: string): boolean => {
+  if (!url) return false;
+  return AUTH_401_BYPASS_PATHS.some((path) => url.includes(path));
+};
+
 /**
  * Create axios instance with base configuration
  */
@@ -39,8 +46,11 @@ const createApiClient = (): AxiosInstance => {
   client.interceptors.response.use(
     (response: AxiosResponse) => response,
     (error: AxiosError<ApiError>) => {
+      const requestUrl = error.config?.url;
+      const bypassRedirect = shouldBypassAuthRedirect(requestUrl);
+
       // Handle 401 Unauthorized - clear auth and redirect to login
-      if (error.response?.status === 401) {
+      if (error.response?.status === 401 && !bypassRedirect) {
         clearAuthData();
         window.location.href = '/login';
       }

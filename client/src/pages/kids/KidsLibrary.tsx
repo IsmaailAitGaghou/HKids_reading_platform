@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Alert, Box, Container, Snackbar, Stack } from "@mui/material";
 import { useAuthContext } from "@/context/useAuthContext";
 import { getBookResume, getKidsBooks, startReading } from "@/api/kids.api";
+import { listPublicCategories } from "@/api/categories.api";
 import {
   KidsBookRail,
-  KidsBottomNav,
   KidsFeaturedBook,
   KidsLibraryHeader,
   KidsLibrarySkeleton,
@@ -12,40 +12,16 @@ import {
 } from "@/components/kids";
 import type { BookResumeData, KidsBook } from "@/types/book.types";
 
-interface ThemeOption {
+interface CategoryOption {
   key: string;
   label: string;
 }
 
-const STOP_WORDS = new Set([
-  "the",
-  "and",
-  "for",
-  "with",
-  "this",
-  "that",
-  "from",
-  "into",
-  "your",
-  "have",
-  "are",
-  "our",
-  "their",
-  "book",
-  "story",
-]);
-
-const toTitleCase = (value: string) =>
-  value
-    .split(" ")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-
-const extractWords = (text: string) =>
-  text
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter((word) => word.length >= 4 && !STOP_WORDS.has(word));
+interface AllowedCategory {
+  id: string;
+  name: string;
+  slug: string;
+}
 
 const calculateProgress = (book: KidsBook, resume?: BookResumeData) => {
   if (!resume || !resume.hasProgress) return 0;
@@ -65,8 +41,9 @@ export function KidsLibrary() {
   const [error, setError] = useState<string | null>(null);
   const [remainingMinutes, setRemainingMinutes] = useState(0);
   const [books, setBooks] = useState<KidsBook[]>([]);
+  const [categories, setCategories] = useState<AllowedCategory[]>([]);
   const [resumeByBookId, setResumeByBookId] = useState<Record<string, BookResumeData>>({});
-  const [selectedTheme, setSelectedTheme] = useState("all");
+  const [selectedCategoryId, setSelectedCategoryId] = useState("all");
   const [featuredIndex, setFeaturedIndex] = useState(0);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -77,11 +54,34 @@ export function KidsLibrary() {
       try {
         setLoading(true);
         setError(null);
-        const response = await getKidsBooks();
+        const booksResponse = await getKidsBooks();
         if (!mounted) return;
 
-        setBooks(response.books || []);
-        setRemainingMinutes(response.remainingMinutes || 0);
+        const normalizedBooks = (booksResponse.books || []).map((book) => ({
+          ...book,
+          categoryIds: Array.isArray(book.categoryIds) ? book.categoryIds : [],
+        }));
+
+        setBooks(normalizedBooks);
+        setRemainingMinutes(booksResponse.remainingMinutes || 0);
+
+        const responseCategories = booksResponse.categories || [];
+        if (responseCategories.length > 0) {
+          setCategories(responseCategories);
+        } else {
+          const uniqueCategoryIds = [...new Set(normalizedBooks.flatMap((book) => book.categoryIds))];
+
+          if (uniqueCategoryIds.length > 0) {
+            const categoriesResponse = await listPublicCategories();
+            if (!mounted) return;
+            const fallbackCategories = (categoriesResponse.categories || []).filter((category) =>
+              uniqueCategoryIds.includes(category.id)
+            );
+            setCategories(fallbackCategories);
+          } else {
+            setCategories([]);
+          }
+        }
       } catch (loadError) {
         if (!mounted) return;
         const message =
@@ -138,41 +138,26 @@ export function KidsLibrary() {
     };
   }, [books]);
 
-  const themeOptions = useMemo<ThemeOption[]>(() => {
-    const countMap = new Map<string, number>();
-
-    for (const book of books) {
-      const text = `${book.title} ${book.summary || ""}`;
-      const uniqueWords = new Set(extractWords(text));
-      uniqueWords.forEach((word) => {
-        countMap.set(word, (countMap.get(word) || 0) + 1);
-      });
-    }
-
-    const dynamicThemes = [...countMap.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(([word]) => ({
-        key: word,
-        label: toTitleCase(word),
-      }));
-
-    return [{ key: "all", label: "All" }, ...dynamicThemes];
-  }, [books]);
+  const categoryOptions = useMemo<CategoryOption[]>(
+    () => [{ key: "all", label: "All" }, ...categories.map((category) => ({ key: category.id, label: category.name }))],
+    [categories]
+  );
 
   const filteredBooks = useMemo(() => {
-    if (selectedTheme === "all") return books;
-    return books.filter((book) => {
-      const haystack = `${book.title} ${book.summary || ""}`.toLowerCase();
-      return haystack.includes(selectedTheme.toLowerCase());
-    });
-  }, [books, selectedTheme]);
+    if (selectedCategoryId === "all") return books;
+    return books.filter((book) => book.categoryIds.includes(selectedCategoryId));
+  }, [books, selectedCategoryId]);
 
   useEffect(() => {
     if (featuredIndex >= filteredBooks.length) {
       setFeaturedIndex(0);
     }
   }, [featuredIndex, filteredBooks.length]);
+
+  const selectedCategoryName = useMemo(() => {
+    if (selectedCategoryId === "all") return "All";
+    return categories.find((category) => category.id === selectedCategoryId)?.name || "Category";
+  }, [categories, selectedCategoryId]);
 
   const featuredBook = filteredBooks.length > 0 ? filteredBooks[featuredIndex] : null;
 
@@ -193,10 +178,7 @@ export function KidsLibrary() {
           return {
             book,
             progressPercent: progress,
-            subtitle:
-              progress >= 90
-                ? "Almost Done!"
-                : `${Math.round(progress)}% Complete`,
+            subtitle: progress >= 90 ? "Almost Done!" : `${Math.round(progress)}% Complete`,
           };
         })
         .filter((item) => item.progressPercent > 0 && item.progressPercent < 100),
@@ -246,10 +228,10 @@ export function KidsLibrary() {
           />
 
           <KidsThemeTabs
-            options={themeOptions}
-            selectedKey={selectedTheme}
+            options={categoryOptions}
+            selectedKey={selectedCategoryId}
             onSelect={(value) => {
-              setSelectedTheme(value);
+              setSelectedCategoryId(value);
               setFeaturedIndex(0);
             }}
           />
@@ -264,15 +246,11 @@ export function KidsLibrary() {
           />
 
           <KidsBookRail
-            title={
-              selectedTheme === "all"
-                ? "Favorite Stories"
-                : `Favorite ${toTitleCase(selectedTheme)} Stories`
-            }
+            title={selectedCategoryId === "all" ? "Favorite Stories" : `Favorite ${selectedCategoryName} Stories`}
             ctaLabel="See all"
-            onCtaClick={() => setSelectedTheme("all")}
+            onCtaClick={() => setSelectedCategoryId("all")}
             items={favoriteRailItems}
-            emptyMessage="No books found for this theme."
+            emptyMessage="No books found for this category."
           />
 
           <KidsBookRail
@@ -280,8 +258,6 @@ export function KidsLibrary() {
             items={continueReadingItems}
             emptyMessage={loadingResume ? "Loading reading progress..." : "No in-progress books yet."}
           />
-
-          <KidsBottomNav />
         </Stack>
       </Container>
 
@@ -294,4 +270,3 @@ export function KidsLibrary() {
     </Box>
   );
 }
-

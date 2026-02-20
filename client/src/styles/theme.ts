@@ -66,7 +66,7 @@ const typography = {
   },
 };
 
-const shadows: ThemeOptions["shadows"] = [
+const shadows = [
   "none",
   "0 1px 2px rgba(0, 0, 0, 0.05)",
   "0 1px 3px rgba(0, 0, 0, 0.1)",
@@ -75,7 +75,7 @@ const shadows: ThemeOptions["shadows"] = [
   "0 20px 25px rgba(0, 0, 0, 0.1)",
   "0 4px 14px rgba(112, 42, 250, 0.2)",
   ...Array(18).fill("0 1px 3px rgba(0, 0, 0, 0.1)"),
-];
+] as ThemeOptions["shadows"];
 
 export const theme = createTheme({
   palette,

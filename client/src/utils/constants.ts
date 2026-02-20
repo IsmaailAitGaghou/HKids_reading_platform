@@ -114,6 +114,7 @@ export const ROUTES = {
     LIBRARY: '/kids/library',
     BOOK_VIEW: (id: string) => `/kids/books/${id}`,
     READING: (id: string) => `/kids/read/${id}`,
+    SESSION_COMPLETE: '/kids/session-complete',
   },
 } as const;
 

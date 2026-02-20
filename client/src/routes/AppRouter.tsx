@@ -16,6 +16,7 @@ import { ParentChildPage } from "@/pages/parent/ParentChildPage";
 import { ParentChildrenManagePage } from "@/pages/parent/ParentChildrenManagePage";
 import { KidsLibrary } from "@/pages/kids/KidsLibrary";
 import { KidsReadPage } from "@/pages/kids/KidsReadPage";
+import { KidsSessionCompletePage } from "@/pages/kids/KidsSessionCompletePage";
 import { ROUTES, ROLES } from "@/utils/constants";
 
 export function AppRouter() {
@@ -148,6 +149,14 @@ export function AppRouter() {
                   element={
                      <ProtectedRoute allowedRoles={[ROLES.CHILD]}>
                         <KidsReadPage />
+                     </ProtectedRoute>
+                  }
+               />
+               <Route
+                  path={ROUTES.KIDS.SESSION_COMPLETE}
+                  element={
+                     <ProtectedRoute allowedRoles={[ROLES.CHILD]}>
+                        <KidsSessionCompletePage />
                      </ProtectedRoute>
                   }
                />

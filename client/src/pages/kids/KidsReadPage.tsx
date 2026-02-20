@@ -22,6 +22,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { endReading, getKidsBook, getKidsBookPages, startReading, trackProgress } from "@/api/kids.api";
 import type { BookPage, KidsBook } from "@/types/book.types";
 import { ROUTES } from "@/utils/constants";
+import { isDailyReadingLimitReachedError } from "@/utils/readingLimits";
 
 interface SessionState {
   id: string;
@@ -108,6 +109,11 @@ export function KidsReadPage() {
         });
         setCurrentIndex(safeStartIndex);
       } catch (loadError) {
+        if (mounted && isDailyReadingLimitReachedError(loadError)) {
+          navigate(ROUTES.KIDS.SESSION_COMPLETE, { replace: true });
+          return;
+        }
+
         const message =
           typeof loadError === "object" &&
           loadError !== null &&
@@ -131,7 +137,7 @@ export function KidsReadPage() {
         void endReading({ sessionId: latestSession.id });
       }
     };
-  }, [id]);
+  }, [id, navigate]);
 
   useEffect(() => {
     if (!session || !currentPage) return;
@@ -162,7 +168,24 @@ export function KidsReadPage() {
   }, [readToMe, currentPage?.text]);
 
   const handleGoHome = async () => {
-    await safelyEndSession(sessionRef.current);
+    const activeSession = sessionRef.current;
+    if (!activeSession) {
+      navigate(ROUTES.KIDS.LIBRARY);
+      return;
+    }
+
+    try {
+      const response = await endReading({ sessionId: activeSession.id });
+      endedSessionRef.current = true;
+
+      if (response.limits.remainingMinutes <= 0) {
+        navigate(ROUTES.KIDS.SESSION_COMPLETE, { replace: true });
+        return;
+      }
+    } catch {
+      await safelyEndSession(activeSession);
+    }
+
     navigate(ROUTES.KIDS.LIBRARY);
   };
 

@@ -13,6 +13,7 @@ import {
 } from "@/components/kids";
 import type { BookResumeData, KidsBook } from "@/types/book.types";
 import { ROUTES } from "@/utils/constants";
+import { isDailyReadingLimitReachedError } from "@/utils/readingLimits";
 
 interface CategoryOption {
   key: string;
@@ -86,6 +87,10 @@ export function KidsLibrary() {
         }
       } catch (loadError) {
         if (!mounted) return;
+        if (isDailyReadingLimitReachedError(loadError)) {
+          navigate(ROUTES.KIDS.SESSION_COMPLETE, { replace: true });
+          return;
+        }
         const message =
           typeof loadError === "object" &&
           loadError !== null &&
@@ -105,7 +110,7 @@ export function KidsLibrary() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     if (books.length === 0) {

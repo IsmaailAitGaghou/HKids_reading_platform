@@ -4,6 +4,7 @@ import { ROLES } from "../../types/auth";
 import { asyncHandler } from "../../utils/asyncHandler";
 import { HttpError } from "../../utils/httpError";
 import { BookModel } from "../books/book.model";
+import { CategoryModel } from "../categories/category.model";
 import { ChildModel } from "../children/child.model";
 import {
   assertChildCanReadNow,
@@ -57,15 +58,38 @@ export const listKidsBooks = asyncHandler(async (req: Request, res: Response) =>
   }
 
   const books = await BookModel.find(filter).sort({ publishedAt: -1 });
+  const allowedCategoryIds = policy.allowedCategoryIds.map((value) => String(value));
+
+  const categoryIdsForLookup =
+    allowedCategoryIds.length > 0
+      ? allowedCategoryIds
+      : [...new Set(books.flatMap((book) => book.categoryIds.map((value) => String(value))))];
+
+  const categories =
+    categoryIdsForLookup.length > 0
+      ? await CategoryModel.find({
+          _id: { $in: categoryIdsForLookup.map((value) => new Types.ObjectId(value)) },
+          isActive: true
+        })
+          .sort({ sortOrder: 1, name: 1 })
+          .select({ name: 1, slug: 1 })
+      : [];
+
   res.status(200).json({
     total: books.length,
     remainingMinutes: Math.max(policy.dailyLimitMinutes - todayMinutes, 0),
+    categories: categories.map((category) => ({
+      id: String(category._id),
+      name: category.name,
+      slug: category.slug
+    })),
     books: books.map((book) => ({
       id: String(book._id),
       title: book.title,
       summary: book.summary,
       coverImageUrl: book.coverImageUrl,
-      pageCount: book.pages.length
+      pageCount: book.pages.length,
+      categoryIds: book.categoryIds.map((value) => String(value))
     }))
   });
 });
@@ -88,7 +112,8 @@ export const getKidsBook = asyncHandler(async (req: Request, res: Response) => {
       title: book.title,
       summary: book.summary,
       coverImageUrl: book.coverImageUrl,
-      pageCount: book.pages.length
+      pageCount: book.pages.length,
+      categoryIds: book.categoryIds.map((value) => String(value))
     }
   });
 });

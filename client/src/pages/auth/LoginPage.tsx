@@ -12,6 +12,8 @@ import {
   Card,
   Container,
   InputAdornment,
+  Typography,
+  Divider
 } from '@mui/material';
 import { LoadingButton } from '@mui/lab';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
@@ -128,6 +130,45 @@ export function LoginPage() {
         >
            Sign in
         </LoadingButton>
+        <Box
+           sx={{
+              mt: 2,
+              p: 2,
+              borderRadius: 2,
+              border: "1px solid",
+              borderColor: "divider",
+              bgcolor: "background.lavender",
+           }}
+        >
+           <Typography
+              variant="subtitle2"
+              sx={{ fontWeight: 700, color: "text.primary", textAlign: "center" }}
+           >
+              Test Accounts
+           </Typography>
+
+           <Divider sx={{ my: 1.5 }} />
+
+           <Stack spacing={1}>
+              <Box>
+                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    Admin login
+                 </Typography>
+                 <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                    admin@hkids.com / Admin123
+                 </Typography>
+              </Box>
+
+              <Box>
+                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    Parent login
+                 </Typography>
+                 <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                    sarah@hkids.com / Parent123
+                 </Typography>
+              </Box>
+           </Stack>
+        </Box>
      </Box>
   );
 

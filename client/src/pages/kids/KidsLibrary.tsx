@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Box, Container, Snackbar, Stack } from "@mui/material";
+import { Alert, Box, Container, Stack } from "@mui/material";
+import { useNavigate } from "react-router-dom";
 import { useAuthContext } from "@/context/useAuthContext";
-import { getBookResume, getKidsBooks, startReading } from "@/api/kids.api";
+import { getBookResume, getKidsBooks } from "@/api/kids.api";
 import { listPublicCategories } from "@/api/categories.api";
 import {
   KidsBookRail,
@@ -11,6 +12,7 @@ import {
   KidsThemeTabs,
 } from "@/components/kids";
 import type { BookResumeData, KidsBook } from "@/types/book.types";
+import { ROUTES } from "@/utils/constants";
 
 interface CategoryOption {
   key: string;
@@ -35,6 +37,7 @@ const getReadingLevel = (pageCount: number) => {
 };
 
 export function KidsLibrary() {
+  const navigate = useNavigate();
   const { user, logout } = useAuthContext();
   const [loading, setLoading] = useState(true);
   const [loadingResume, setLoadingResume] = useState(false);
@@ -45,7 +48,6 @@ export function KidsLibrary() {
   const [resumeByBookId, setResumeByBookId] = useState<Record<string, BookResumeData>>({});
   const [selectedCategoryId, setSelectedCategoryId] = useState("all");
   const [featuredIndex, setFeaturedIndex] = useState(0);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -186,12 +188,7 @@ export function KidsLibrary() {
   );
 
   const handleReadNow = async (bookId: string) => {
-    try {
-      const response = await startReading({ bookId });
-      setToastMessage(response.message || "Reading session started.");
-    } catch {
-      setToastMessage("Unable to start reading session.");
-    }
+    navigate(ROUTES.KIDS.READING(bookId));
   };
 
   const handlePrevFeatured = () => {
@@ -249,24 +246,19 @@ export function KidsLibrary() {
             title={selectedCategoryId === "all" ? "Favorite Stories" : `Favorite ${selectedCategoryName} Stories`}
             ctaLabel="See all"
             onCtaClick={() => setSelectedCategoryId("all")}
+            onItemClick={handleReadNow}
             items={favoriteRailItems}
             emptyMessage="No books found for this category."
           />
 
           <KidsBookRail
             title="Finish Reading"
+            onItemClick={handleReadNow}
             items={continueReadingItems}
             emptyMessage={loadingResume ? "Loading reading progress..." : "No in-progress books yet."}
           />
         </Stack>
       </Container>
-
-      <Snackbar
-        open={Boolean(toastMessage)}
-        autoHideDuration={2600}
-        onClose={() => setToastMessage(null)}
-        message={toastMessage || ""}
-      />
     </Box>
   );
 }

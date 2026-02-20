@@ -1,4 +1,4 @@
-import { alpha, createTheme, type ThemeOptions } from "@mui/material/styles";
+import {  createTheme, type ThemeOptions } from "@mui/material/styles";
 
 const palette = {
   primary: {
@@ -182,13 +182,13 @@ export const theme = createTheme({
     },
 
     MuiDrawer: {
-      styleOverrides: {
-        paper: {
-          backgroundColor: palette.text.primary,
-          color: palette.primary.contrastText,
-        },
-      },
+  styleOverrides: {
+    paper: {
+      backgroundColor: palette.background.paper,
+      color: palette.text.primary,
     },
+  },
+},
 
     MuiListItemIcon: {
       styleOverrides: {
@@ -200,21 +200,21 @@ export const theme = createTheme({
     },
 
     MuiListItemButton: {
-      styleOverrides: {
-        root: {
-          borderRadius: 8,
-          margin: "4px 8px",
-          "&.Mui-selected": {
-            backgroundColor: palette.primary.main,
-            color: palette.primary.contrastText,
-            "&:hover": { backgroundColor: palette.primary.light },
-          },
-          "&:hover": {
-            backgroundColor: alpha("#FFFFFF", 0.08),
-          },
-        },
+  styleOverrides: {
+    root: {
+      borderRadius: 8,
+      margin: "4px 8px",
+      "&:hover": {
+        backgroundColor: palette.action.hover,
+      },
+      "&.Mui-selected": {
+        backgroundColor: palette.action.selected,
+        color: palette.primary.main,
+        "&:hover": { backgroundColor: palette.action.selected },
       },
     },
+  },
+},
 
     MuiTabs: {
       styleOverrides: {

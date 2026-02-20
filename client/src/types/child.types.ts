@@ -48,6 +48,7 @@ export interface UpdatePolicyRequest {
 
 export interface ParentAnalyticsTopBook {
   bookId: string;
+  title?: string;
   sessions: number;
   minutes: number;
 }

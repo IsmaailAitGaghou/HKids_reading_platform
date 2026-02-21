@@ -21,17 +21,19 @@ interface UploadResult {
   format: string;
 }
 
-export const uploadImageBuffer = async (
-  buffer: Buffer,
-  folder = "hkids/books"
-): Promise<UploadResult> => {
+interface UploadBufferOptions {
+  folder: string;
+  resourceType: "image" | "raw";
+}
+
+const uploadBuffer = async (buffer: Buffer, options: UploadBufferOptions): Promise<UploadResult> => {
   if (!isConfigured) {
     throw new HttpError(500, "Cloudinary is not configured");
   }
 
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
-      { folder, resource_type: "image" },
+      { folder: options.folder, resource_type: options.resourceType },
       (error, result) => {
         if (error || !result) {
           reject(error ?? new Error("Cloudinary upload failed"));
@@ -47,4 +49,18 @@ export const uploadImageBuffer = async (
     );
     stream.end(buffer);
   });
+};
+
+export const uploadImageBuffer = async (
+  buffer: Buffer,
+  folder = "hkids/books"
+): Promise<UploadResult> => {
+  return uploadBuffer(buffer, { folder, resourceType: "image" });
+};
+
+export const uploadFileBuffer = async (
+  buffer: Buffer,
+  folder = "hkids/books/files"
+): Promise<UploadResult> => {
+  return uploadBuffer(buffer, { folder, resourceType: "raw" });
 };

@@ -17,6 +17,14 @@ const bookSchema = new Schema(
     slug: { type: String, required: true, unique: true, trim: true },
     summary: { type: String, default: "", trim: true, maxlength: 800 },
     coverImageUrl: { type: String, default: "", trim: true },
+    contentType: {
+      type: String,
+      enum: ["structured", "pdf"],
+      default: "structured",
+      required: true
+    },
+    pdfUrl: { type: String, default: "", trim: true },
+    pdfPageCount: { type: Number, min: 0, default: 0 },
     ageGroupId: { type: Schema.Types.ObjectId, ref: "AgeGroup", required: true, index: true },
     categoryIds: [{ type: Schema.Types.ObjectId, ref: "Category" }],
     pages: [pageSchema],

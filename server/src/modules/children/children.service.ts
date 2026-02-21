@@ -7,9 +7,14 @@ import { ChildModel } from "./child.model";
 import { ChildPolicyModel } from "./child-policy.model";
 import { ReadingSessionModel } from "./reading-session.model";
 
-const getStartOfTodayUtc = (): Date => {
-  const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+const getTodayLocalRange = (): { start: Date; end: Date } => {
+  const start = new Date();
+  start.setHours(0, 0, 0, 0);
+
+  const end = new Date(start);
+  end.setDate(end.getDate() + 1);
+
+  return { start, end };
 };
 
 const minutesFromScheduleTime = (value: string): number => {
@@ -64,11 +69,10 @@ export const ensurePolicyReferencesExist = async (policy: {
 };
 
 export const getChildMinutesReadToday = async (childId: string): Promise<number> => {
-  const startOfToday = getStartOfTodayUtc();
+  const { start, end } = getTodayLocalRange();
   const sessions = await ReadingSessionModel.find({
     childId,
-    startedAt: { $gte: startOfToday },
-    endedAt: { $ne: null }
+    endedAt: { $gte: start, $lt: end }
   });
   return sessions.reduce((sum, session) => sum + (session.minutes ?? 0), 0);
 };

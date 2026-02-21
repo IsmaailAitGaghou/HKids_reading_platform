@@ -7,6 +7,8 @@ import { AgeGroupModel } from "../age-groups/age-group.model";
 import { CategoryModel } from "../categories/category.model";
 import { BookDocument, BookModel } from "./book.model";
 
+type BookContentType = "structured" | "pdf";
+
 interface BookPageInput {
   pageNumber: number;
   title?: string;
@@ -15,12 +17,79 @@ interface BookPageInput {
   narrationUrl?: string;
 }
 
+interface BaseBookInput {
+  title: string;
+  summary?: string;
+  coverImageUrl?: string;
+  ageGroupId: string;
+  categoryIds: string[];
+  tags: string[];
+  visibility: "private" | "public";
+}
+
+interface CreateStructuredBookBody extends BaseBookInput {
+  contentType?: "structured";
+  pages: BookPageInput[];
+}
+
+interface CreatePdfBookBody extends BaseBookInput {
+  contentType: "pdf";
+  pdfUrl: string;
+  pdfPageCount: number;
+}
+
+type CreateBookBody = CreateStructuredBookBody | CreatePdfBookBody;
+
+interface UpdateBookBody {
+  title?: string;
+  summary?: string;
+  coverImageUrl?: string;
+  ageGroupId?: string;
+  categoryIds?: string[];
+  contentType?: BookContentType;
+  pages?: BookPageInput[];
+  pdfUrl?: string;
+  pdfPageCount?: number;
+  tags?: string[];
+  visibility?: "private" | "public";
+  status?: "draft" | "published" | "archived";
+}
+
+const resolveContentType = (book: { contentType?: string | null }): BookContentType => {
+  return book.contentType === "pdf" ? "pdf" : "structured";
+};
+
+const getBookPageCount = (book: {
+  contentType?: string | null;
+  pdfPageCount?: number | null;
+  pages: Array<unknown>;
+}) => {
+  if (resolveContentType(book) === "pdf") {
+    return Math.max(book.pdfPageCount ?? 0, 0);
+  }
+  return book.pages.length;
+};
+
+const assertBookHasReadableContent = (book: {
+  contentType?: string | null;
+  pdfPageCount?: number | null;
+  pages: Array<unknown>;
+}) => {
+  if (getBookPageCount(book) < 1) {
+    throw new HttpError(400, "Book must have at least one page before publishing");
+  }
+};
+
 const sanitizeBook = (book: BookDocument) => ({
   id: String(book._id),
   title: book.title,
   slug: book.slug,
   summary: book.summary,
   coverImageUrl: book.coverImageUrl,
+  contentType: resolveContentType(book),
+  pdfUrl: book.pdfUrl || "",
+  pdfPageCount: Math.max(book.pdfPageCount ?? 0, 0),
+  pageCount: getBookPageCount(book),
   ageGroupId: String(book.ageGroupId),
   categoryIds: book.categoryIds.map((value) => String(value)),
   pages: [...book.pages].sort((a, b) => a.pageNumber - b.pageNumber),
@@ -64,20 +133,23 @@ export const createBook = asyncHandler(async (req: Request, res: Response) => {
     throw new HttpError(401, "Authentication required");
   }
 
-  const body = req.body as {
-    title: string;
-    summary: string;
-    coverImageUrl: string;
-    ageGroupId: string;
-    categoryIds: string[];
-    pages: BookPageInput[];
-    tags: string[];
-    visibility: "private" | "public";
-  };
+  const body = req.body as CreateBookBody;
+  const contentType = body.contentType === "pdf" ? "pdf" : "structured";
+  let pagesPayload: BookPageInput[] = [];
+  let pdfUrlPayload = "";
+  let pdfPageCountPayload = 0;
 
   await ensureAgeGroupExists(body.ageGroupId);
   await ensureCategoriesExist(body.categoryIds);
-  ensureUniquePageNumbers(body.pages);
+  if (contentType === "structured") {
+    const structuredBody = body as CreateStructuredBookBody;
+    ensureUniquePageNumbers(structuredBody.pages);
+    pagesPayload = structuredBody.pages;
+  } else {
+    const pdfBody = body as CreatePdfBookBody;
+    pdfUrlPayload = pdfBody.pdfUrl;
+    pdfPageCountPayload = pdfBody.pdfPageCount;
+  }
 
   const slug = slugify(body.title);
   const existing = await BookModel.findOne({ slug });
@@ -90,9 +162,12 @@ export const createBook = asyncHandler(async (req: Request, res: Response) => {
     slug,
     summary: body.summary ?? "",
     coverImageUrl: body.coverImageUrl ?? "",
+    contentType,
+    pdfUrl: pdfUrlPayload,
+    pdfPageCount: pdfPageCountPayload,
     ageGroupId: new Types.ObjectId(body.ageGroupId),
     categoryIds: body.categoryIds.map((value) => new Types.ObjectId(value)),
-    pages: body.pages,
+    pages: pagesPayload,
     tags: body.tags,
     visibility: body.visibility,
     status: "draft",
@@ -149,21 +224,19 @@ export const updateBook = asyncHandler(async (req: Request, res: Response) => {
   }
 
   const { id } = req.params as { id: string };
-  const body = req.body as {
-    title?: string;
-    summary?: string;
-    coverImageUrl?: string;
-    ageGroupId?: string;
-    categoryIds?: string[];
-    pages?: BookPageInput[];
-    tags?: string[];
-    visibility?: "private" | "public";
-    status?: "draft" | "published" | "archived";
-  };
+  const body = req.body as UpdateBookBody;
 
   const book = await BookModel.findById(id);
   if (!book) {
     throw new HttpError(404, "Book not found");
+  }
+
+  const targetContentType = body.contentType ?? resolveContentType(book);
+  if (body.pages && targetContentType === "pdf") {
+    throw new HttpError(400, "PDF books cannot include structured pages");
+  }
+  if ((typeof body.pdfUrl === "string" || typeof body.pdfPageCount === "number") && targetContentType === "structured") {
+    throw new HttpError(400, "Structured books cannot include PDF metadata");
   }
 
   if (body.title && body.title !== book.title) {
@@ -178,6 +251,7 @@ export const updateBook = asyncHandler(async (req: Request, res: Response) => {
 
   if (typeof body.summary === "string") book.summary = body.summary;
   if (typeof body.coverImageUrl === "string") book.coverImageUrl = body.coverImageUrl;
+  if (body.contentType) book.contentType = body.contentType;
   if (body.ageGroupId) {
     await ensureAgeGroupExists(body.ageGroupId);
     book.ageGroupId = new Types.ObjectId(body.ageGroupId);
@@ -193,14 +267,28 @@ export const updateBook = asyncHandler(async (req: Request, res: Response) => {
     ensureUniquePageNumbers(body.pages);
     book.set("pages", body.pages);
   }
+  if (typeof body.pdfUrl === "string") book.pdfUrl = body.pdfUrl;
+  if (typeof body.pdfPageCount === "number") book.pdfPageCount = body.pdfPageCount;
+
+  if (resolveContentType(book) === "pdf") {
+    if (!book.pdfUrl || book.pdfPageCount < 1) {
+      throw new HttpError(400, "PDF books require pdfUrl and pdfPageCount");
+    }
+    book.set("pages", []);
+  } else {
+    if (!book.pages.length) {
+      throw new HttpError(400, "Structured books require at least one page");
+    }
+    book.pdfUrl = "";
+    book.pdfPageCount = 0;
+  }
+
   if (body.tags) book.set("tags", body.tags);
   if (body.visibility) book.visibility = body.visibility;
   if (body.status) {
     book.status = body.status;
     if (body.status === "published") {
-      if (!book.pages.length) {
-        throw new HttpError(400, "Book must have at least one page before publishing");
-      }
+      assertBookHasReadableContent(book);
       book.isApproved = true;
       book.publishedAt = new Date();
     }
@@ -222,6 +310,9 @@ export const reorderBookPages = asyncHandler(async (req: Request, res: Response)
   const book = await BookModel.findById(id);
   if (!book) {
     throw new HttpError(404, "Book not found");
+  }
+  if (resolveContentType(book) === "pdf") {
+    throw new HttpError(400, "Page reordering is only available for structured books");
   }
 
   const existingNumbers = book.pages.map((value) => value.pageNumber).sort((a, b) => a - b);
@@ -276,9 +367,7 @@ export const publishBook = asyncHandler(async (req: Request, res: Response) => {
     throw new HttpError(404, "Book not found");
   }
 
-  if (!book.pages.length) {
-    throw new HttpError(400, "Book must have at least one page before publishing");
-  }
+  assertBookHasReadableContent(book);
 
   // Publish action is admin-only, so approval is applied automatically here.
   book.isApproved = true;

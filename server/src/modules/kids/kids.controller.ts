@@ -8,6 +8,7 @@ import { CategoryModel } from "../categories/category.model";
 import { ChildModel } from "../children/child.model";
 import {
   assertChildCanReadNow,
+  getChildMinutesReadToday,
   getOrCreateChildPolicy,
   isBookAllowedForChild
 } from "../children/children.service";
@@ -32,6 +33,21 @@ const getResumePageIndex = (session: {
     return Math.max(...session.pagesRead);
   }
   return 0;
+};
+
+const resolveContentType = (book: { contentType?: string | null }) => {
+  return book.contentType === "pdf" ? "pdf" : "structured";
+};
+
+const getBookPageCount = (book: {
+  contentType?: string | null;
+  pdfPageCount?: number | null;
+  pages: Array<unknown>;
+}) => {
+  if (resolveContentType(book) === "pdf") {
+    return Math.max(book.pdfPageCount ?? 0, 0);
+  }
+  return book.pages.length;
 };
 
 export const listKidsBooks = asyncHandler(async (req: Request, res: Response) => {
@@ -87,7 +103,10 @@ export const listKidsBooks = asyncHandler(async (req: Request, res: Response) =>
       title: book.title,
       summary: book.summary,
       coverImageUrl: book.coverImageUrl,
-      pageCount: book.pages.length,
+      pageCount: getBookPageCount(book),
+      contentType: resolveContentType(book),
+      pdfUrl: book.pdfUrl || "",
+      pdfPageCount: Math.max(book.pdfPageCount ?? 0, 0),
       categoryIds: book.categoryIds.map((value) => String(value))
     }))
   });
@@ -111,7 +130,10 @@ export const getKidsBook = asyncHandler(async (req: Request, res: Response) => {
       title: book.title,
       summary: book.summary,
       coverImageUrl: book.coverImageUrl,
-      pageCount: book.pages.length,
+      pageCount: getBookPageCount(book),
+      contentType: resolveContentType(book),
+      pdfUrl: book.pdfUrl || "",
+      pdfPageCount: Math.max(book.pdfPageCount ?? 0, 0),
       categoryIds: book.categoryIds.map((value) => String(value))
     }
   });
@@ -131,13 +153,19 @@ export const getKidsBookPages = asyncHandler(async (req: Request, res: Response)
     throw new HttpError(404, "Book not found");
   }
 
-  const pages = [...book.pages].sort((a, b) => a.pageNumber - b.pageNumber);
+  const contentType = resolveContentType(book);
+  const pages =
+    contentType === "structured" ? [...book.pages].sort((a, b) => a.pageNumber - b.pageNumber) : [];
+
   res.status(200).json({
     book: {
       id: String(book._id),
       title: book.title,
       summary: book.summary,
-      pageCount: pages.length
+      pageCount: getBookPageCount(book),
+      contentType,
+      pdfUrl: book.pdfUrl || "",
+      pdfPageCount: Math.max(book.pdfPageCount ?? 0, 0)
     },
     pages
   });
@@ -315,14 +343,7 @@ export const endReading = asyncHandler(async (req: Request, res: Response) => {
   await session.save();
 
   const policy = await getOrCreateChildPolicy(childId);
-  const todaySessions = await ReadingSessionModel.find({
-    childId,
-    startedAt: {
-      $gte: new Date(Date.UTC(endedAt.getUTCFullYear(), endedAt.getUTCMonth(), endedAt.getUTCDate()))
-    },
-    endedAt: { $ne: null }
-  });
-  const todayMinutes = todaySessions.reduce((sum, value) => sum + (value.minutes ?? 0), 0);
+  const todayMinutes = await getChildMinutesReadToday(childId);
 
   res.status(200).json({
     message: "Reading session ended",

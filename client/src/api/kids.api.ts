@@ -5,7 +5,6 @@ import type {
   KidsBookResponse,
   KidsBookPagesResponse,
   KidsBooksResponse,
-  BookPage,
   BookResumeData,
   KidsBookResumeResponse,
 } from '@/types/book.types';
@@ -35,9 +34,8 @@ export const getKidsBook = async (id: string): Promise<KidsBook> => {
 /**
  * Get book pages for reading
  */
-export const getKidsBookPages = async (id: string): Promise<BookPage[]> => {
-  const response = await get<KidsBookPagesResponse>(API_ENDPOINTS.KIDS.BOOK_PAGES(id));
-  return response.pages;
+export const getKidsBookPages = async (id: string): Promise<KidsBookPagesResponse> => {
+  return get<KidsBookPagesResponse>(API_ENDPOINTS.KIDS.BOOK_PAGES(id));
 };
 
 /**

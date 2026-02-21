@@ -45,10 +45,18 @@ export const createBook = async (data: CreateBookRequest): Promise<Book> => {
     title: data.title.trim(),
     ageGroupId: data.ageGroupId.trim(),
     categoryIds: data.categoryIds,
-    pages: data.pages,
     tags: data.tags,
     visibility: data.visibility,
   };
+
+  if (data.contentType === 'pdf') {
+    payload.contentType = 'pdf';
+    payload.pdfUrl = data.pdfUrl.trim();
+    payload.pdfPageCount = data.pdfPageCount;
+  } else {
+    payload.contentType = 'structured';
+    payload.pages = data.pages;
+  }
 
   if (summary) {
     payload.summary = summary;
@@ -76,7 +84,10 @@ export const updateBook = async (id: string, data: UpdateBookRequest): Promise<B
   if (typeof data.coverImageUrl === 'string') payload.coverImageUrl = data.coverImageUrl.trim();
   if (typeof data.ageGroupId === 'string') payload.ageGroupId = data.ageGroupId.trim();
   if (Array.isArray(data.categoryIds)) payload.categoryIds = data.categoryIds;
+  if (typeof data.contentType === 'string') payload.contentType = data.contentType;
   if (Array.isArray(data.pages)) payload.pages = data.pages;
+  if (typeof data.pdfUrl === 'string') payload.pdfUrl = data.pdfUrl.trim();
+  if (typeof data.pdfPageCount === 'number') payload.pdfPageCount = data.pdfPageCount;
   if (Array.isArray(data.tags)) payload.tags = data.tags;
   if (typeof data.visibility === 'string') payload.visibility = data.visibility;
   if (typeof data.status === 'string') payload.status = data.status;

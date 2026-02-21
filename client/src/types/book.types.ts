@@ -1,5 +1,7 @@
 import type { BookStatus } from '@/utils/constants';
 
+export type BookContentType = 'structured' | 'pdf';
+
 // Book Types
 export interface Book {
   id: string;
@@ -7,6 +9,10 @@ export interface Book {
   slug: string;
   summary?: string;
   coverImageUrl: string;
+  contentType?: BookContentType;
+  pdfUrl?: string;
+  pdfPageCount?: number;
+  pageCount?: number;
   categoryIds: string[];
   ageGroupId?: string;
   ageGroupIds?: string[];
@@ -39,12 +45,18 @@ export interface BookWithPages extends Book {
 }
 
 // Admin Book Requests
-export interface CreateBookRequest {
+interface BaseCreateBookRequest {
   title: string;
   summary?: string;
   coverImageUrl?: string;
   ageGroupId: string;
   categoryIds: string[];
+  tags: string[];
+  visibility: 'private' | 'public';
+}
+
+export interface CreateStructuredBookRequest extends BaseCreateBookRequest {
+  contentType?: 'structured';
   pages: Array<{
     pageNumber: number;
     title?: string;
@@ -52,9 +64,15 @@ export interface CreateBookRequest {
     imageUrl?: string;
     narrationUrl?: string;
   }>;
-  tags: string[];
-  visibility: 'private' | 'public';
 }
+
+export interface CreatePdfBookRequest extends BaseCreateBookRequest {
+  contentType: 'pdf';
+  pdfUrl: string;
+  pdfPageCount: number;
+}
+
+export type CreateBookRequest = CreateStructuredBookRequest | CreatePdfBookRequest;
 
 export interface UpdateBookRequest {
   title?: string;
@@ -62,6 +80,7 @@ export interface UpdateBookRequest {
   coverImageUrl?: string;
   ageGroupId?: string;
   categoryIds?: string[];
+  contentType?: BookContentType;
   pages?: Array<{
     pageNumber: number;
     title?: string;
@@ -69,6 +88,8 @@ export interface UpdateBookRequest {
     imageUrl?: string;
     narrationUrl?: string;
   }>;
+  pdfUrl?: string;
+  pdfPageCount?: number;
   tags?: string[];
   visibility?: 'private' | 'public';
   status?: 'draft' | 'published' | 'archived';
@@ -105,6 +126,9 @@ export interface KidsBook {
   summary: string;
   coverImageUrl: string;
   pageCount: number;
+  contentType: BookContentType;
+  pdfUrl?: string;
+  pdfPageCount?: number;
   categoryIds: string[];
 }
 
@@ -129,6 +153,9 @@ export interface KidsBookPagesResponse {
     title: string;
     summary: string;
     pageCount: number;
+    contentType: BookContentType;
+    pdfUrl?: string;
+    pdfPageCount?: number;
   };
   pages: BookPage[];
 }

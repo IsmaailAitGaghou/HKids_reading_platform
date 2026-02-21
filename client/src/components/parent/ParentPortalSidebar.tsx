@@ -25,6 +25,8 @@ interface ParentPortalSidebarProps {
   childrenProfiles: Child[];
   activeChildId?: string;
   activeSection: "dashboard" | "profiles" | "manage";
+  mobile?: boolean;
+  onNavigate?: () => void;
   onOpenDashboard: () => void;
   onOpenProfiles: () => void;
   onOpenManageChildren: () => void;
@@ -43,6 +45,8 @@ export function ParentPortalSidebar({
   childrenProfiles,
   activeChildId,
   activeSection,
+  mobile = false,
+  onNavigate,
   onOpenDashboard,
   onOpenProfiles,
   onOpenManageChildren,
@@ -50,20 +54,25 @@ export function ParentPortalSidebar({
   onOpenChildLogin,
   onLogout,
 }: ParentPortalSidebarProps) {
+  const withNavigate = (action: () => void) => {
+    action();
+    onNavigate?.();
+  };
+
   return (
     <Box
       sx={{
-        width: 320,
-        minWidth: 320,
+        width: mobile ? "100%" : 320,
+        minWidth: mobile ? 0 : 320,
         alignSelf: "flex-start",
-        position: "sticky",
-        top: 0,
-        height: "100vh",
+        position: mobile ? "relative" : "sticky",
+        top: mobile ? "auto" : 0,
+        height: mobile ? "100%" : "100vh",
         overflowY: "auto",
-        borderRight: "1px solid",
-        borderColor: "divider",
+        borderRight: mobile ? "none" : "1px solid",
+        borderColor: mobile ? "transparent" : "divider",
         bgcolor: "background.paper",
-        display: { xs: "none", lg: "flex" },
+        display: mobile ? "flex" : { xs: "none", lg: "flex" },
         flexDirection: "column",
       }}
     >
@@ -107,11 +116,13 @@ export function ParentPortalSidebar({
           return (
             <ListItem key={item.key} disablePadding sx={{ mb: 0.6 }}>
               <ListItemButton
-                onClick={() => {
-                  if (isDashboard) onOpenDashboard();
-                  if (isProfiles) onOpenProfiles();
-                  if (isManageChildren) onOpenManageChildren();
-                }}
+                onClick={() =>
+                  withNavigate(() => {
+                    if (isDashboard) onOpenDashboard();
+                    if (isProfiles) onOpenProfiles();
+                    if (isManageChildren) onOpenManageChildren();
+                  })
+                }
                 selected={selected}
                 sx={{
                   borderRadius: 1.5,
@@ -145,7 +156,7 @@ export function ParentPortalSidebar({
           return (
             <Button
               key={child.id}
-              onClick={() => onOpenChild(child.id)}
+              onClick={() => withNavigate(() => onOpenChild(child.id))}
               type="button"
               sx={{
                 justifyContent: "flex-start",
@@ -180,7 +191,7 @@ export function ParentPortalSidebar({
           fullWidth
           variant="contained"
           startIcon={<Login />}
-          onClick={onOpenChildLogin}
+          onClick={() => withNavigate(onOpenChildLogin)}
           type="button"
           sx={{ py: 1.1, mb: 1 }}
           disabled={childrenProfiles.length === 0}
@@ -193,7 +204,7 @@ export function ParentPortalSidebar({
           variant="outlined"
           color="inherit"
           startIcon={<Logout />}
-          onClick={onLogout}
+          onClick={() => withNavigate(onLogout)}
           type="button"
           sx={{ py: 1.1 }}
         >

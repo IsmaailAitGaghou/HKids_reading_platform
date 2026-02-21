@@ -4,6 +4,7 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { PublicRoute } from "@/components/auth/PublicRoute";
 import { AdminLayout } from "@/layouts/AdminLayout";
 import { ParentLayout } from "@/layouts/ParentLayout";
+import { KidsLayout } from "@/layouts/KidsLayout";
 import { LoginPage } from "@/pages/auth/LoginPage";
 import { RegisterPage } from "@/pages/auth/RegisterPage";
 import { ChildLoginPage } from "@/pages/auth/ChildLoginPage";
@@ -137,29 +138,19 @@ export function AppRouter() {
 
                {/* Kids Routes */}
                <Route
-                  path={ROUTES.KIDS.LIBRARY}
+                  path="/kids"
                   element={
                      <ProtectedRoute allowedRoles={[ROLES.CHILD]}>
-                        <KidsLibrary />
+                        <KidsLayout />
                      </ProtectedRoute>
                   }
-               />
-               <Route
-                  path={ROUTES.KIDS.READING(":id")}
-                  element={
-                     <ProtectedRoute allowedRoles={[ROLES.CHILD]}>
-                        <KidsReadPage />
-                     </ProtectedRoute>
-                  }
-               />
-               <Route
-                  path={ROUTES.KIDS.SESSION_COMPLETE}
-                  element={
-                     <ProtectedRoute allowedRoles={[ROLES.CHILD]}>
-                        <KidsSessionCompletePage />
-                     </ProtectedRoute>
-                  }
-               />
+               >
+                  <Route index element={<Navigate to="library" replace />} />
+                  <Route path="library" element={<KidsLibrary />} />
+                  <Route path="books/:id" element={<KidsReadPage />} />
+                  <Route path="read/:id" element={<KidsReadPage />} />
+                  <Route path="session-complete" element={<KidsSessionCompletePage />} />
+               </Route>
 
                {/* Catch-all - redirect to login */}
                <Route

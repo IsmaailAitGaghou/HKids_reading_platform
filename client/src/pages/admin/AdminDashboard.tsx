@@ -377,10 +377,16 @@ export function AdminDashboard() {
                </Box>
             </Stack>
 
-            <Stack
-               direction={{ xs: "column", sm: "row" }}
-               spacing={3}
-               sx={{ width: "100%" }}
+            <Box
+               sx={{
+                  display: "grid",
+                  gridTemplateColumns: {
+                     xs: "1fr",
+                     sm: "repeat(2, minmax(0, 1fr))",
+                     lg: "repeat(3, minmax(0, 1fr))",
+                  },
+                  gap: 3,
+               }}
             >
                <StatCard
                   label="Total Books"
@@ -423,7 +429,7 @@ export function AdminDashboard() {
                      </Typography>
                   }
                />
-            </Stack>
+            </Box>
 
             <Stack spacing={1.5}>
                <Stack
@@ -436,15 +442,18 @@ export function AdminDashboard() {
                   <Tabs
                      value={activeTab}
                      onChange={(_, v) => setActiveTab(v)}
+                     variant="scrollable"
+                     allowScrollButtonsMobile
                      sx={{
                         bgcolor: alpha(theme.palette.primary.main, 0.06),
                         borderRadius: 999,
                         p: 0.5,
                         minHeight: 44,
+                        maxWidth: "100%",
                         "& .MuiTabs-indicator": { display: "none" },
                         "& .MuiTab-root": {
                            minHeight: 38,
-                           px: 2.5,
+                           px: { xs: 1.5, sm: 2.5 },
                            borderRadius: 999,
                            fontWeight: 600,
                            fontSize: "0.95rem",
@@ -461,8 +470,8 @@ export function AdminDashboard() {
                      <Tab label="Drafts" />
                   </Tabs>
 
-                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-                     <FormControl size="small" sx={{ minWidth: 170 }}>
+                  <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ width: { xs: "100%", md: "auto" } }}>
+                     <FormControl size="small" sx={{ minWidth: { sm: 170 }, width: { xs: "100%", sm: "auto" } }}>
                         <InputLabel id="age-group-filter-label">Age Group</InputLabel>
                         <Select
                            labelId="age-group-filter-label"
@@ -479,7 +488,7 @@ export function AdminDashboard() {
                         </Select>
                      </FormControl>
 
-                     <FormControl size="small" sx={{ minWidth: 180 }}>
+                     <FormControl size="small" sx={{ minWidth: { sm: 180 }, width: { xs: "100%", sm: "auto" } }}>
                         <InputLabel id="category-filter-label">Category</InputLabel>
                         <Select
                            labelId="category-filter-label"

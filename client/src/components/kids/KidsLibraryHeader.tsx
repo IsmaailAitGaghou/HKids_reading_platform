@@ -1,5 +1,7 @@
 import { Lock, MenuBook } from "@mui/icons-material";
 import { Avatar, Box, IconButton, Stack, Typography } from "@mui/material";
+import { motion, useReducedMotion } from "framer-motion";
+import { kidsMotion } from "@/utils/kidsMotion";
 
 interface KidsLibraryHeaderProps {
   childName: string;
@@ -14,6 +16,9 @@ export function KidsLibraryHeader({
   remainingMinutes,
   onLockClick,
 }: KidsLibraryHeaderProps) {
+  const reducedMotion = useReducedMotion();
+  const reduced = Boolean(reducedMotion);
+
   return (
     <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={2}>
       <Stack direction="row" spacing={1.25} alignItems="center">
@@ -63,11 +68,12 @@ export function KidsLibraryHeader({
           </Box>
         </Stack>
 
-        <IconButton onClick={onLockClick} type="button" sx={{ bgcolor: "secondary.main" }}>
-          <Lock />
-        </IconButton>
+        <motion.div {...kidsMotion.buttonMotion(reduced)}>
+          <IconButton onClick={onLockClick} type="button" sx={{ bgcolor: "secondary.main" }}>
+            <Lock />
+          </IconButton>
+        </motion.div>
       </Stack>
     </Stack>
   );
 }
-

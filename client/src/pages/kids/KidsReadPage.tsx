@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -7,23 +7,21 @@ import {
   CircularProgress,
   IconButton,
   LinearProgress,
+  Slide,
+  type SlideProps,
   Snackbar,
   Stack,
   Typography,
 } from "@mui/material";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Home,
-  VolumeUp,
-  VolumeOff,
-} from "@mui/icons-material";
+import { ChevronLeft, ChevronRight, Home, VolumeUp, VolumeOff } from "@mui/icons-material";
 import { getDocument, GlobalWorkerOptions, type PDFDocumentProxy } from "pdfjs-dist";
 import pdfWorkerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useNavigate, useParams } from "react-router-dom";
 import { endReading, getKidsBook, getKidsBookPages, startReading, trackProgress } from "@/api/kids.api";
 import type { BookPage, KidsBook } from "@/types/book.types";
 import { ROUTES } from "@/utils/constants";
+import { kidsMotion } from "@/utils/kidsMotion";
 import { isDailyReadingLimitReachedError } from "@/utils/readingLimits";
 
 GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
@@ -39,6 +37,8 @@ const splitParagraphs = (text: string) =>
     .map((part) => part.trim())
     .filter(Boolean);
 
+const SnackbarSlideUp = (props: SlideProps) => <Slide {...props} direction="up" />;
+
 export function KidsReadPage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -50,15 +50,38 @@ export function KidsReadPage() {
   const [session, setSession] = useState<SessionState | null>(null);
   const [readToMe, setReadToMe] = useState(false);
   const [snackbar, setSnackbar] = useState<string | null>(null);
+  const [pageDirection, setPageDirection] = useState(1);
   const [pdfDocument, setPdfDocument] = useState<PDFDocumentProxy | null>(null);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [pdfRenderLoading, setPdfRenderLoading] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  const [showProgressSaved, setShowProgressSaved] = useState(false);
   const [pdfViewportVersion, setPdfViewportVersion] = useState(0);
   const endedSessionRef = useRef(false);
   const sessionRef = useRef<SessionState | null>(null);
   const pdfCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const pdfViewportRef = useRef<HTMLDivElement | null>(null);
+  const progressSavedTimeoutRef = useRef<number | null>(null);
+  const progressSyncTimeoutRef = useRef<number | null>(null);
+  const queuedProgressRef = useRef<{ sessionId: string; pageIndex: number } | null>(null);
+  const lastProgressSyncAtRef = useRef(0);
+  const reducedMotion = useReducedMotion();
+  const reduced = Boolean(reducedMotion);
+  const navButtonMotion = reduced
+    ? {}
+    : {
+        whileHover: { scale: 1.05 },
+        whileTap: { scale: 0.98 },
+        transition: kidsMotion.transition(reduced, kidsMotion.duration.fast),
+      };
+  const navButtonSx = {
+    width: { xs: 52, md: 56 },
+    height: { xs: 52, md: 56 },
+    bgcolor: "background.paper",
+    boxShadow: 3,
+    zIndex: 40,
+    pointerEvents: "auto",
+  } as const;
 
   const isPdfBook = (book?.contentType || "structured") === "pdf";
   const currentPage = isPdfBook ? null : pages[currentIndex] || null;
@@ -70,6 +93,10 @@ export function KidsReadPage() {
     () => splitParagraphs(currentPage?.text || ""),
     [currentPage?.text]
   );
+  const pageFlipVariants = useMemo(() => {
+    if (reduced) return kidsMotion.pageFlipReduced;
+    return pageDirection >= 0 ? kidsMotion.pageFlipNext : kidsMotion.pageFlipPrev;
+  }, [reduced, pageDirection]);
 
   const safelyEndSession = async (nextSession: SessionState | null) => {
     if (!nextSession || endedSessionRef.current) return;
@@ -81,9 +108,69 @@ export function KidsReadPage() {
     }
   };
 
+  const triggerProgressSaved = useCallback(() => {
+    setShowProgressSaved(true);
+    if (progressSavedTimeoutRef.current) {
+      window.clearTimeout(progressSavedTimeoutRef.current);
+    }
+    progressSavedTimeoutRef.current = window.setTimeout(() => {
+      setShowProgressSaved(false);
+      progressSavedTimeoutRef.current = null;
+    }, reduced ? 320 : 760);
+  }, [reduced]);
+
+  const scheduleProgressSync = useCallback(
+    (sessionId: string, pageIndex: number) => {
+      queuedProgressRef.current = { sessionId, pageIndex };
+
+      if (progressSyncTimeoutRef.current) {
+        window.clearTimeout(progressSyncTimeoutRef.current);
+      }
+
+      const settleMs = reduced ? 90 : 260;
+      const throttleMs = reduced ? 120 : 320;
+      const elapsed = Date.now() - lastProgressSyncAtRef.current;
+      const throttleWait = Math.max(0, throttleMs - elapsed);
+      const waitMs = Math.max(settleMs, throttleWait);
+
+      progressSyncTimeoutRef.current = window.setTimeout(() => {
+        const payload = queuedProgressRef.current;
+        if (!payload) return;
+        queuedProgressRef.current = null;
+
+        void (async () => {
+          try {
+            await trackProgress({
+              sessionId: payload.sessionId,
+              pageIndex: payload.pageIndex,
+            });
+            lastProgressSyncAtRef.current = Date.now();
+            triggerProgressSaved();
+          } catch {
+            return;
+          } finally {
+            progressSyncTimeoutRef.current = null;
+          }
+        })();
+      }, waitMs);
+    },
+    [reduced, triggerProgressSaved]
+  );
+
   useEffect(() => {
     sessionRef.current = session;
   }, [session]);
+
+  useEffect(() => {
+    return () => {
+      if (progressSavedTimeoutRef.current) {
+        window.clearTimeout(progressSavedTimeoutRef.current);
+      }
+      if (progressSyncTimeoutRef.current) {
+        window.clearTimeout(progressSyncTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!id) {
@@ -165,11 +252,8 @@ export function KidsReadPage() {
 
   useEffect(() => {
     if (!session || totalPages < 1) return;
-    void trackProgress({
-      sessionId: session.id,
-      pageIndex: currentIndex,
-    });
-  }, [session, currentIndex, totalPages]);
+    scheduleProgressSync(session.id, currentIndex);
+  }, [session, currentIndex, totalPages, scheduleProgressSync]);
 
   useEffect(() => {
     if (isPdfBook || !readToMe || !currentPage?.text) {
@@ -228,21 +312,37 @@ export function KidsReadPage() {
     if (!isPdfBook || !pdfDocument) return;
 
     let cancelled = false;
+    let activeRenderTask: { cancel: () => void; promise: Promise<unknown> } | null = null;
 
     const renderPdfPage = async () => {
       try {
         setPdfRenderLoading(true);
         setPdfError(null);
 
-        const canvas = pdfCanvasRef.current;
-        if (!canvas) return;
-        const context = canvas.getContext("2d");
-        if (!context) throw new Error("Missing PDF canvas context");
-
         const pageNumber = Math.min(Math.max(currentIndex + 1, 1), Math.max(totalPages, 1));
         const page = await pdfDocument.getPage(pageNumber);
 
         if (cancelled) return;
+
+        const waitForTargetCanvas = async () => {
+          const maxWaitMs = 1200;
+          const startedAt = Date.now();
+
+          while (!cancelled) {
+            const canvas = pdfCanvasRef.current;
+            if (canvas && canvas.dataset.pageIndex === String(currentIndex)) {
+              return canvas;
+            }
+            if (Date.now() - startedAt >= maxWaitMs) break;
+            await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
+          }
+          return null;
+        };
+
+        const canvas = await waitForTargetCanvas();
+        if (!canvas || cancelled) return;
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("Missing PDF canvas context");
 
         const baseViewport = page.getViewport({ scale: 1 });
         const viewportContainer = pdfViewportRef.current;
@@ -255,7 +355,8 @@ export function KidsReadPage() {
 
         canvas.width = Math.floor(viewport.width);
         canvas.height = Math.floor(viewport.height);
-        await page.render({ canvas, canvasContext: context, viewport }).promise;
+        activeRenderTask = page.render({ canvas, canvasContext: context, viewport });
+        await activeRenderTask.promise;
       } catch {
         if (cancelled) return;
         setPdfError("Failed to render this PDF page.");
@@ -267,6 +368,7 @@ export function KidsReadPage() {
     void renderPdfPage();
     return () => {
       cancelled = true;
+      activeRenderTask?.cancel();
     };
   }, [isPdfBook, pdfDocument, currentIndex, totalPages, pdfViewportVersion]);
 
@@ -303,11 +405,13 @@ export function KidsReadPage() {
 
   const handlePrev = () => {
     if (currentIndex <= 0) return;
+    setPageDirection(-1);
     setCurrentIndex((prev) => prev - 1);
   };
 
   const handleNext = () => {
     if (currentIndex >= totalPages - 1) return;
+    setPageDirection(1);
     setCurrentIndex((prev) => prev + 1);
   };
 
@@ -350,13 +454,15 @@ export function KidsReadPage() {
           alignItems="center"
         >
           <Stack direction="row" spacing={1.5} alignItems="center">
-            <IconButton
-              onClick={handleGoHome}
-              type="button"
-              sx={{ bgcolor: "background.paper", boxShadow: 1 }}
-            >
-              <Home fontSize="small" />
-            </IconButton>
+            <motion.div {...kidsMotion.buttonMotion(reduced)}>
+              <IconButton
+                onClick={handleGoHome}
+                type="button"
+                sx={{ bgcolor: "background.paper", boxShadow: 1 }}
+              >
+                <Home fontSize="small" />
+              </IconButton>
+            </motion.div>
             <Box>
               <Typography variant="h5" sx={{ fontWeight: 800 }}>
                 HKids Reader
@@ -369,14 +475,16 @@ export function KidsReadPage() {
 
           {!isPdfBook && (
             <Stack direction="row" spacing={1}>
-              <Button
-                type="button"
-                variant="contained"
-                startIcon={readToMe ? <VolumeOff /> : <VolumeUp />}
-                onClick={() => setReadToMe((prev) => !prev)}
-              >
-                {readToMe ? "Stop Reading" : "Read to Me"}
-              </Button>
+              <motion.div {...kidsMotion.buttonMotion(reduced)}>
+                <Button
+                  type="button"
+                  variant="contained"
+                  startIcon={readToMe ? <VolumeOff /> : <VolumeUp />}
+                  onClick={() => setReadToMe((prev) => !prev)}
+                >
+                  {readToMe ? "Stop Reading" : "Read to Me"}
+                </Button>
+              </motion.div>
             </Stack>
           )}
         </Stack>
@@ -394,185 +502,295 @@ export function KidsReadPage() {
                 justifyContent: "center",
                 p: 1,
                 position: "relative",
+                perspective: 1100,
+                zIndex: 1,
               }}
             >
-              {(pdfLoading || pdfRenderLoading) && (
-                <Stack sx={{ alignItems: "center", gap: 1.25 }}>
-                  <CircularProgress />
-                </Stack>
-              )}
+              <AnimatePresence initial={false} mode="wait">
+                <motion.div
+                  key={`pdf-page-${currentIndex}`}
+                  variants={pageFlipVariants}
+                  initial="initial"
+                  animate="animate"
+                  exit="exit"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    willChange: "transform, opacity, box-shadow",
+                    backfaceVisibility: "hidden",
+                    transformOrigin: pageDirection >= 0 ? "right center" : "left center",
+                    position: "relative",
+                    zIndex: 1,
+                  }}
+                >
+                  <Box
+                    component="canvas"
+                    ref={pdfCanvasRef}
+                    data-page-index={currentIndex}
+                    sx={{
+                      width: "auto",
+                      maxWidth: "100%",
+                      height: "auto",
+                      maxHeight: "100%",
+                      display: pdfError ? "none" : "block",
+                    }}
+                  />
+                </motion.div>
+              </AnimatePresence>
 
-              {!pdfLoading && !pdfRenderLoading && pdfError && (
-                <Alert severity="error" sx={{ maxWidth: 520 }}>
-                  {pdfError}
-                </Alert>
-              )}
+              <AnimatePresence>
+                {(pdfLoading || pdfRenderLoading) && (
+                  <motion.div
+                    key="pdf-loading"
+                    variants={kidsMotion.fadeScaleVariants(reduced)}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                    style={{ position: "absolute", right: 16, top: 16, pointerEvents: "none", zIndex: 12 }}
+                  >
+                    <Stack
+                      sx={{
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 36,
+                        height: 36,
+                        borderRadius: "50%",
+                        bgcolor: "background.paper",
+                        boxShadow: 2,
+                      }}
+                    >
+                      <CircularProgress size={18} />
+                    </Stack>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-              <Box
-                component="canvas"
-                ref={pdfCanvasRef}
-                sx={{
-                  width: "auto",
-                  maxWidth: "100%",
-                  height: "auto",
-                  maxHeight: "100%",
-                  display: pdfError ? "none" : "block",
-                }}
-              />
+              <AnimatePresence>
+                {!pdfLoading && !pdfRenderLoading && pdfError && (
+                  <motion.div
+                    key="pdf-error"
+                    variants={kidsMotion.fadeScaleVariants(reduced)}
+                    initial="initial"
+                    animate="animate"
+                    exit="exit"
+                    style={{ position: "absolute", pointerEvents: "none", zIndex: 11 }}
+                  >
+                    <Alert severity="error" sx={{ maxWidth: 520 }}>
+                      {pdfError}
+                    </Alert>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-              <IconButton
-                type="button"
-                onClick={handlePrev}
-                disabled={currentIndex === 0 || pdfLoading || pdfRenderLoading}
-                sx={{
+            </Box>
+            <Box
+              sx={{
+                position: "absolute",
+                inset: 0,
+                zIndex: 30,
+                pointerEvents: "none",
+              }}
+            >
+              <motion.div
+                {...navButtonMotion}
+                style={{
                   position: "absolute",
-                  left: 12,
+                  left: 10,
                   top: "50%",
                   transform: "translateY(-50%)",
-                  bgcolor: "background.paper",
-                  boxShadow: 2,
+                  pointerEvents: "auto",
                 }}
               >
-                <ChevronLeft />
-              </IconButton>
+                <IconButton
+                  type="button"
+                  onClick={handlePrev}
+                  disabled={currentIndex === 0 || pdfLoading || pdfRenderLoading}
+                  sx={navButtonSx}
+                >
+                  <ChevronLeft />
+                </IconButton>
+              </motion.div>
 
-              <IconButton
-                type="button"
-                onClick={handleNext}
-                disabled={currentIndex === totalPages - 1 || pdfLoading || pdfRenderLoading}
-                sx={{
+              <motion.div
+                {...navButtonMotion}
+                style={{
                   position: "absolute",
-                  right: 12,
+                  right: 10,
                   top: "50%",
                   transform: "translateY(-50%)",
-                  bgcolor: "background.paper",
-                  boxShadow: 2,
+                  pointerEvents: "auto",
                 }}
               >
-                <ChevronRight />
-              </IconButton>
+                <IconButton
+                  type="button"
+                  onClick={handleNext}
+                  disabled={currentIndex === totalPages - 1 || pdfLoading || pdfRenderLoading}
+                  sx={navButtonSx}
+                >
+                  <ChevronRight />
+                </IconButton>
+              </motion.div>
             </Box>
           </Card>
         ) : (
           <Card
-            sx={{ borderRadius: 3, overflow: "hidden", position: "relative", flex: 1, minHeight: 0 }}
+            sx={{ borderRadius: 3, overflow: "hidden", position: "relative", flex: 1, minHeight: 0, perspective: 1100 }}
           >
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: { xs: "1fr", md: "50% 50%" },
-                height: "100%",
-                minHeight: 0,
-              }}
-            >
-              <Box sx={{ position: "relative", bgcolor: "action.hover" }}>
-                {safeCurrentPage.imageUrl ? (
+            <AnimatePresence initial={false} mode="wait">
+              <motion.div
+                key={`structured-page-${currentIndex}`}
+                variants={pageFlipVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                style={{
+                  height: "100%",
+                  willChange: "transform, opacity, box-shadow",
+                  backfaceVisibility: "hidden",
+                  transformOrigin: pageDirection >= 0 ? "right center" : "left center",
+                  position: "relative",
+                  zIndex: 1,
+                }}
+              >
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: { xs: "1fr", md: "50% 50%" },
+                    height: "100%",
+                    minHeight: 0,
+                  }}
+                >
+                  <Box sx={{ position: "relative", bgcolor: "action.hover" }}>
+                    {safeCurrentPage.imageUrl ? (
+                      <Box
+                        component="img"
+                        src={safeCurrentPage.imageUrl}
+                        alt={
+                          safeCurrentPage.title ||
+                          `Page ${safeCurrentPage.pageNumber}`
+                        }
+                        sx={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                      />
+                    ) : (
+                      <Stack
+                        sx={{
+                          height: "100%",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          p: 3,
+                        }}
+                      >
+                        <Typography variant="h6" color="text.secondary">
+                          No image for this page
+                        </Typography>
+                      </Stack>
+                    )}
+
+                  </Box>
+
                   <Box
-                    component="img"
-                    src={safeCurrentPage.imageUrl}
-                    alt={
-                      safeCurrentPage.title ||
-                      `Page ${safeCurrentPage.pageNumber}`
-                    }
                     sx={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                    }}
-                  />
-                ) : (
-                  <Stack
-                    sx={{
-                      height: "100%",
-                      alignItems: "center",
+                      p: { xs: 2, md: 5 },
+                      display: "flex",
+                      flexDirection: "column",
                       justifyContent: "center",
-                      p: 3,
+                      overflowY: "auto",
                     }}
                   >
-                    <Typography variant="h6" color="text.secondary">
-                      No image for this page
+                    <Typography variant="h3" sx={{ fontWeight: 700, mb: 3, textAlign: "center" }}>
+                      {safeCurrentPage.title || `Page ${safeCurrentPage.pageNumber}`}
                     </Typography>
-                  </Stack>
-                )}
 
+                    <Stack
+                      spacing={3}
+                      sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "center",
+                        height: "100%",
+                      }}
+                    >
+                      {(pageParagraphs.length > 0
+                        ? pageParagraphs
+                        : [safeCurrentPage.text || ""]
+                      ).map((paragraph, idx) => (
+                        <Typography
+                          key={idx}
+                          variant="h4"
+                          sx={{ fontWeight: 400, lineHeight: 1.25 }}
+                        >
+                          {paragraph}
+                        </Typography>
+                      ))}
+                    </Stack>
+
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ mt: "auto", alignSelf: "flex-end" }}
+                    >
+                      {safeCurrentPage.pageNumber}
+                    </Typography>
+                  </Box>
+                </Box>
+              </motion.div>
+            </AnimatePresence>
+
+            <Box
+              sx={{
+                position: "absolute",
+                inset: 0,
+                zIndex: 30,
+                pointerEvents: "none",
+              }}
+            >
+              <motion.div
+                {...navButtonMotion}
+                style={{
+                  position: "absolute",
+                  left: 10,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  pointerEvents: "auto",
+                }}
+              >
                 <IconButton
                   type="button"
                   onClick={handlePrev}
                   disabled={currentIndex === 0}
-                  sx={{
-                    position: "absolute",
-                    left: 12,
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    bgcolor: "background.paper",
-                    boxShadow: 2,
-                  }}
+                  sx={navButtonSx}
                 >
                   <ChevronLeft />
                 </IconButton>
-              </Box>
+              </motion.div>
 
-              <Box
-                sx={{
-                  p: { xs: 2, md: 5 },
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "center",
-                  overflowY: "auto",
+              <motion.div
+                {...navButtonMotion}
+                style={{
+                  position: "absolute",
+                  right: 10,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  pointerEvents: "auto",
                 }}
               >
-                <Typography variant="h3" sx={{ fontWeight: 700, mb: 3, textAlign: "center" }}>
-                  {safeCurrentPage.title || `Page ${safeCurrentPage.pageNumber}`}
-                </Typography>
-
-                <Stack
-                  spacing={3}
-                  sx={{
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "center",
-                    height: "100%",
-                  }}
+                <IconButton
+                  type="button"
+                  onClick={handleNext}
+                  disabled={currentIndex === totalPages - 1}
+                  sx={navButtonSx}
                 >
-                  {(pageParagraphs.length > 0
-                    ? pageParagraphs
-                    : [safeCurrentPage.text || ""]
-                  ).map((paragraph, idx) => (
-                    <Typography
-                      key={idx}
-                      variant="h4"
-                      sx={{ fontWeight: 400, lineHeight: 1.25 }}
-                    >
-                      {paragraph}
-                    </Typography>
-                  ))}
-                </Stack>
-
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{ mt: "auto", alignSelf: "flex-end" }}
-                >
-                  {safeCurrentPage.pageNumber}
-                </Typography>
-              </Box>
+                  <ChevronRight />
+                </IconButton>
+              </motion.div>
             </Box>
-
-            <IconButton
-              type="button"
-              onClick={handleNext}
-              disabled={currentIndex === totalPages - 1}
-              sx={{
-                position: "absolute",
-                right: 12,
-                top: "50%",
-                transform: "translateY(-50%)",
-                bgcolor: "background.paper",
-                boxShadow: 2,
-              }}
-            >
-              <ChevronRight />
-            </IconButton>
           </Card>
         )}
 
@@ -588,6 +806,22 @@ export function KidsReadPage() {
           >
             {`READING PROGRESS: ${Math.round(progressPercent)}%`}
           </Typography>
+          <AnimatePresence>
+            {showProgressSaved && (
+              <motion.div
+                key="progress-saved-indicator"
+                variants={kidsMotion.fadeScaleVariants(reduced)}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                style={{ display: "flex", justifyContent: "center" }}
+              >
+                <Typography variant="caption" color="text.secondary" sx={{ mt: 0.25 }}>
+                  Progress saved
+                </Typography>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </Box>
       </Stack>
 
@@ -596,6 +830,7 @@ export function KidsReadPage() {
         autoHideDuration={2200}
         onClose={() => setSnackbar(null)}
         message={snackbar || ""}
+        TransitionComponent={SnackbarSlideUp}
       />
     </Box>
   );

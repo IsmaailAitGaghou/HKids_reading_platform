@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Box, Container, Stack } from "@mui/material";
+import { motion, useReducedMotion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuthContext } from "@/context/useAuthContext";
 import { getBookResume, getKidsBooks } from "@/api/kids.api";
@@ -13,6 +14,7 @@ import {
 } from "@/components/kids";
 import type { BookResumeData, KidsBook } from "@/types/book.types";
 import { ROUTES } from "@/utils/constants";
+import { kidsMotion } from "@/utils/kidsMotion";
 import { isDailyReadingLimitReachedError } from "@/utils/readingLimits";
 
 interface CategoryOption {
@@ -40,6 +42,8 @@ const getReadingLevel = (pageCount: number) => {
 export function KidsLibrary() {
   const navigate = useNavigate();
   const { user, logout } = useAuthContext();
+  const reducedMotion = useReducedMotion();
+  const reduced = Boolean(reducedMotion);
   const [loading, setLoading] = useState(true);
   const [loadingResume, setLoadingResume] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -219,50 +223,70 @@ export function KidsLibrary() {
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "background.kids", py: 3 }}>
       <Container maxWidth="xl">
-        <Stack spacing={3.5}>
-          {error && <Alert severity="error">{error}</Alert>}
+        <motion.div
+          variants={kidsMotion.listStaggerVariants(reduced)}
+          initial="initial"
+          animate="animate"
+        >
+          <Stack spacing={3.5}>
+            {error && (
+              <motion.div variants={kidsMotion.listItemVariants(reduced)}>
+                <Alert severity="error">{error}</Alert>
+              </motion.div>
+            )}
 
-          <KidsLibraryHeader
-            childName={user?.name || "Child"}
-            childAvatar={(user as { avatar?: string } | null)?.avatar}
-            remainingMinutes={remainingMinutes}
-            onLockClick={logout}
-          />
+            <motion.div variants={kidsMotion.listItemVariants(reduced)}>
+              <KidsLibraryHeader
+                childName={user?.name || "Child"}
+                childAvatar={(user as { avatar?: string } | null)?.avatar}
+                remainingMinutes={remainingMinutes}
+                onLockClick={logout}
+              />
+            </motion.div>
 
-          <KidsThemeTabs
-            options={categoryOptions}
-            selectedKey={selectedCategoryId}
-            onSelect={(value) => {
-              setSelectedCategoryId(value);
-              setFeaturedIndex(0);
-            }}
-          />
+            <motion.div variants={kidsMotion.listItemVariants(reduced)}>
+              <KidsThemeTabs
+                options={categoryOptions}
+                selectedKey={selectedCategoryId}
+                onSelect={(value) => {
+                  setSelectedCategoryId(value);
+                  setFeaturedIndex(0);
+                }}
+              />
+            </motion.div>
 
-          <KidsFeaturedBook
-            book={featuredBook}
-            currentIndex={featuredIndex}
-            total={filteredBooks.length}
-            onPrev={handlePrevFeatured}
-            onNext={handleNextFeatured}
-            onReadNow={handleReadNow}
-          />
+            <motion.div variants={kidsMotion.listItemVariants(reduced)}>
+              <KidsFeaturedBook
+                book={featuredBook}
+                currentIndex={featuredIndex}
+                total={filteredBooks.length}
+                onPrev={handlePrevFeatured}
+                onNext={handleNextFeatured}
+                onReadNow={handleReadNow}
+              />
+            </motion.div>
 
-          <KidsBookRail
-            title={selectedCategoryId === "all" ? "Favorite Stories" : `Favorite ${selectedCategoryName} Stories`}
-            ctaLabel="See all"
-            onCtaClick={() => setSelectedCategoryId("all")}
-            onItemClick={handleReadNow}
-            items={favoriteRailItems}
-            emptyMessage="No books found for this category."
-          />
+            <motion.div variants={kidsMotion.listItemVariants(reduced)}>
+              <KidsBookRail
+                title={selectedCategoryId === "all" ? "Favorite Stories" : `Favorite ${selectedCategoryName} Stories`}
+                ctaLabel="See all"
+                onCtaClick={() => setSelectedCategoryId("all")}
+                onItemClick={handleReadNow}
+                items={favoriteRailItems}
+                emptyMessage="No books found for this category."
+              />
+            </motion.div>
 
-          <KidsBookRail
-            title="Finish Reading"
-            onItemClick={handleReadNow}
-            items={continueReadingItems}
-            emptyMessage={loadingResume ? "Loading reading progress..." : "No in-progress books yet."}
-          />
-        </Stack>
+            <motion.div variants={kidsMotion.listItemVariants(reduced)}>
+              <KidsBookRail
+                title="Finish Reading"
+                onItemClick={handleReadNow}
+                items={continueReadingItems}
+                emptyMessage={loadingResume ? "Loading reading progress..." : "No in-progress books yet."}
+              />
+            </motion.div>
+          </Stack>
+        </motion.div>
       </Container>
     </Box>
   );

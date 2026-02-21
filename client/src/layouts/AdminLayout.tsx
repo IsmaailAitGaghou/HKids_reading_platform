@@ -26,6 +26,8 @@ import {
    TextField,
    Typography,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import {
    Category,
    Groups,
@@ -78,6 +80,8 @@ const navigationItems = [
 ];
 
 export function AdminLayout({ children }: AdminLayoutProps) {
+   const theme = useTheme();
+   const isMobile = useMediaQuery(theme.breakpoints.down("lg"));
    const navigate = useNavigate();
    const location = useLocation();
    const { user, logout } = useAuthContext();
@@ -87,7 +91,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
    const isAgeGroupsRoute = location.pathname === ROUTES.ADMIN.AGE_GROUPS;
 
    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-   const drawerWidth = isSidebarCollapsed
+   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+   const isSidebarCompact = !isMobile && isSidebarCollapsed;
+   const drawerWidth = isSidebarCompact
       ? DRAWER_WIDTH_COLLAPSED
       : DRAWER_WIDTH_EXPANDED;
 
@@ -192,6 +198,10 @@ export function AdminLayout({ children }: AdminLayoutProps) {
       };
    }, []);
 
+   useEffect(() => {
+      setIsMobileSidebarOpen(false);
+   }, [location.pathname]);
+
    const handleCloseCategoryDialog = () => {
       if (isCategorySubmitting) return;
       setIsCategoryDialogOpen(false);
@@ -277,11 +287,16 @@ export function AdminLayout({ children }: AdminLayoutProps) {
    return (
       <Box sx={{ display: "flex", minHeight: "100vh" }}>
          <Drawer
-            variant="permanent"
+            variant={isMobile ? "temporary" : "permanent"}
+            open={isMobile ? isMobileSidebarOpen : true}
+            onClose={() => setIsMobileSidebarOpen(false)}
+            ModalProps={{ keepMounted: true }}
+            key={isMobile ? "admin-mobile-drawer" : "admin-desktop-drawer"}
             sx={{
                width: drawerWidth,
                flexShrink: 0,
-               transition: "width 200ms ease",
+               transition: isMobile ? undefined : "width 200ms ease",
+               zIndex: (drawerTheme) => drawerTheme.zIndex.appBar + 2,
                "& .MuiDrawer-paper": {
                   width: drawerWidth,
                   boxSizing: "border-box",
@@ -289,16 +304,17 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                   borderRight: "1px solid",
                   borderColor: "divider",
                   overflowX: "hidden",
-                  transition: "width 200ms ease",
+                  transition: isMobile ? undefined : "width 200ms ease",
+                  zIndex: (drawerTheme) => drawerTheme.zIndex.appBar + 2,
                },
             }}
          >
             <Box
                sx={{
-                  px: isSidebarCollapsed ? 1 : 2,
+                  px: isSidebarCompact ? 1 : 2,
                   py: 1.4,
                   display: "flex",
-                  justifyContent: isSidebarCollapsed ? "center" : "flex-start",
+                  justifyContent: isSidebarCompact ? "center" : "flex-start",
                }}
             >
                <Stack direction="row" spacing={1.5} alignItems="center">
@@ -317,7 +333,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                      <MenuBook sx={{ fontSize: 24 }} />
                   </Box>
 
-                  {!isSidebarCollapsed && (
+                  {!isSidebarCompact && (
                      <Box>
                         <Typography
                            variant="h6"
@@ -338,7 +354,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
             </Box>
 
 
-            <List sx={{ px: isSidebarCollapsed ? 0.5 : 1, py: 2, flex: 1 }}>
+            <List sx={{ px: isSidebarCompact ? 0.5 : 1, py: 2, flex: 1 }}>
                {navigationItems.map((item) => {
                   const isActive = location.pathname === item.path;
 
@@ -349,22 +365,22 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                            sx={{
                               borderRadius: 2,
                               minHeight: 48,
-                              justifyContent: isSidebarCollapsed ? "center" : "flex-start",
-                              px: isSidebarCollapsed ? 1 : 1.5,
+                              justifyContent: isSidebarCompact ? "center" : "flex-start",
+                              px: isSidebarCompact ? 1 : 1.5,
                               bgcolor: isActive ? "#F0E7FF" : "transparent",
                               color: isActive ? "#702AFA" : "text.primary",
                            }}
                         >
                            <ListItemIcon
                               sx={{
-                                 minWidth: isSidebarCollapsed ? 0 : 40,
-                                 mr: isSidebarCollapsed ? 0 : 0.5,
+                                 minWidth: isSidebarCompact ? 0 : 40,
+                                 mr: isSidebarCompact ? 0 : 0.5,
                                  color: isActive ? "#702AFA" : "text.secondary",
                               }}
                            >
                               {item.icon}
                            </ListItemIcon>
-                           {!isSidebarCollapsed && (
+                           {!isSidebarCompact && (
                               <ListItemText
                                  primary={item.title}
                                  primaryTypographyProps={{
@@ -381,12 +397,12 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
             <Divider />
 
-            <Box sx={{ p: isSidebarCollapsed ? 1 : 2 }}>
+            <Box sx={{ p: isSidebarCompact ? 1 : 2 }}>
                <Stack
                   direction="row"
-                  spacing={isSidebarCollapsed ? 0 : 1.5}
+                  spacing={isSidebarCompact ? 0 : 1.5}
                   alignItems="center"
-                  justifyContent={isSidebarCollapsed ? "center" : "flex-start"}
+                  justifyContent={isSidebarCompact ? "center" : "flex-start"}
                   sx={{
                      p: 1.5,
                      borderRadius: 2,
@@ -405,7 +421,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                      {(user?.name?.trim()?.charAt(0) || "A").toUpperCase()}
                   </Avatar>
 
-                  {!isSidebarCollapsed && (
+                  {!isSidebarCompact && (
                      <>
                         <Box sx={{ flex: 1, minWidth: 0 }}>
                            <Typography
@@ -461,21 +477,34 @@ export function AdminLayout({ children }: AdminLayoutProps) {
          >
             <Box
                sx={{
-                  height: 72,
+                  minHeight: 72,
                   px: { xs: 2, md: 3 },
+                  py: { xs: 1, md: 0 },
                   bgcolor: "background.paper",
                   borderBottom: "1px solid",
                   borderColor: "divider",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
+                  flexWrap: "wrap",
                   gap: 2,
                }}
             >
-               <Stack direction="row" alignItems="center" spacing={1.5} sx={{ width: "100%" }}>
+               <Stack
+                  direction="row"
+                  alignItems="center"
+                  spacing={1.5}
+                  sx={{ width: { xs: "auto", sm: "100%" }, minWidth: 0, flex: 1 }}
+               >
                   <IconButton
                      type="button"
-                     onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+                     onClick={() => {
+                        if (isMobile) {
+                           setIsMobileSidebarOpen(true);
+                           return;
+                        }
+                        setIsSidebarCollapsed((prev) => !prev);
+                     }}
                      sx={{
                         width: 36,
                         height: 36,
@@ -495,6 +524,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                         px: 2,
                         borderRadius: 999,
                         bgcolor: "#F3F4F6",
+                        display: { xs: "none", sm: "flex" },
                      }}
                   >
                      <Search sx={{ fontSize: 20, color: "text.secondary", mr: 1 }} />
@@ -510,7 +540,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                   </Stack>
                </Stack>
 
-               <Stack direction="row" alignItems="center" spacing={1.5}>
+               <Stack direction="row" alignItems="center" spacing={{ xs: 0.75, sm: 1.5 }}>
                   <IconButton
                      size="small"
                      sx={{
@@ -527,7 +557,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                         variant="contained"
                         onClick={() => navigate(ROUTES.ADMIN.BOOK_CREATE)}
                         sx={{
-                           px: 2.75,
+                           px: { xs: 1.6, sm: 2.75 },
                            py: 1,
                            borderRadius: 999,
                            fontSize: "0.875rem",
@@ -536,7 +566,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                         }}
                         type="button"
                      >
-                        Upload New Book
+                        {isMobile ? "New Book" : "Upload New Book"}
                      </Button>
                   )}
 
@@ -545,7 +575,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                         variant="contained"
                         onClick={() => setIsCategoryDialogOpen(true)}
                         sx={{
-                           px: 2.75,
+                           px: { xs: 1.6, sm: 2.75 },
                            py: 1,
                            borderRadius: 999,
                            fontSize: "0.875rem",
@@ -554,7 +584,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                         }}
                         type="button"
                      >
-                        Add New Category
+                        {isMobile ? "New Category" : "Add New Category"}
                      </Button>
                   )}
 
@@ -563,7 +593,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                         variant="contained"
                         onClick={() => setIsAgeGroupDialogOpen(true)}
                         sx={{
-                           px: 2.75,
+                           px: { xs: 1.6, sm: 2.75 },
                            py: 1,
                            borderRadius: 999,
                            fontSize: "0.875rem",
@@ -572,7 +602,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
                         }}
                         type="button"
                      >
-                        Add New Age Group
+                        {isMobile ? "New Age Group" : "Add New Age Group"}
                      </Button>
                   )}
                </Stack>

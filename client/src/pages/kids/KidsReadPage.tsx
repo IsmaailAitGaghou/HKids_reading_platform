@@ -270,7 +270,7 @@ export function KidsReadPage() {
               <Box
                  sx={{
                     display: "grid",
-                    gridTemplateColumns: { xs: "1fr", md: "44% 56%" },
+                    gridTemplateColumns: { xs: "1fr", md: "50% 50%" },
                     minHeight: { xs: 560, md: 720 },
                  }}
               >

@@ -68,8 +68,7 @@ export const listKidsBooks = asyncHandler(async (req: Request, res: Response) =>
   const categories =
     categoryIdsForLookup.length > 0
       ? await CategoryModel.find({
-          _id: { $in: categoryIdsForLookup.map((value) => new Types.ObjectId(value)) },
-          isActive: true
+          _id: { $in: categoryIdsForLookup.map((value) => new Types.ObjectId(value)) }
         })
           .sort({ sortOrder: 1, name: 1 })
           .select({ name: 1, slug: 1 })

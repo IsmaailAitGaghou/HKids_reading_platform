@@ -1,6 +1,4 @@
-import { AutoAwesome, Pets, RocketLaunch, Science, Search } from "@mui/icons-material";
 import { Box, Button, Stack, Typography } from "@mui/material";
-import type { ReactNode } from "react";
 
 interface ThemeOption {
   key: string;
@@ -12,14 +10,6 @@ interface KidsThemeTabsProps {
   selectedKey: string;
   onSelect: (key: string) => void;
 }
-
-const themeIcons: ReactNode[] = [
-  <Pets key="pets" />,
-  <RocketLaunch key="rocket" />,
-  <AutoAwesome key="magic" />,
-  <Science key="science" />,
-  <Search key="search" />,
-];
 
 export function KidsThemeTabs({
   options,
@@ -44,7 +34,7 @@ export function KidsThemeTabs({
           justifyContent: "center",
         }}
       >
-        {options.map((option, index) => {
+        {options.map((option) => {
           const selected = option.key === selectedKey;
           return (
             <Button
@@ -65,9 +55,6 @@ export function KidsThemeTabs({
                 boxShadow: selected ? 4 : 1,
               }}
             >
-              <Box sx={{ display: "grid", placeItems: "center" }}>
-                {themeIcons[index % themeIcons.length]}
-              </Box>
               <Typography variant="subtitle2" sx={{ fontWeight: 700 }} noWrap>
                 {option.label}
               </Typography>

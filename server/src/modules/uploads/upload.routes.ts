@@ -32,7 +32,7 @@ const fileUpload = multer({
   }
 });
 
-router.post("/image", requireAuth, requireRole(ROLES.ADMIN), imageUpload.single("file"), uploadImage);
+router.post("/image", requireAuth, imageUpload.single("file"), uploadImage);
 router.post("/file", requireAuth, requireRole(ROLES.ADMIN), fileUpload.single("file"), uploadFile);
 
 export default router;

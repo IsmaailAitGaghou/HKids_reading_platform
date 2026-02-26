@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Avatar,
@@ -6,6 +6,7 @@ import {
   Button,
   Card,
   CardContent,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -20,12 +21,14 @@ import {
   Stack,
   Switch,
   TextField,
+  Tooltip,
   Typography,
 } from "@mui/material";
-import { Add, Delete, Edit, Visibility } from "@mui/icons-material";
+import { Add, Close, Delete, Edit, PhotoCamera, Visibility } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { createChild, deleteChild, listChildren, updateChild } from "@/api/parent.api";
 import { listPublicAgeGroups } from "@/api/ageGroups.api";
+import { uploadImage } from "@/api/uploads.api";
 import type { Child } from "@/types/child.types";
 import type { AgeGroup } from "@/api/ageGroups.api";
 import { ROUTES } from "@/utils/constants";
@@ -102,6 +105,9 @@ export function ParentChildrenManagePage() {
   const [form, setForm] = useState<ChildFormState>(defaultFormState);
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarUploadProgress, setAvatarUploadProgress] = useState(0);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -170,6 +176,39 @@ export function ParentChildrenManagePage() {
     setDialogMode(null);
     setEditingChild(null);
     setFormError(null);
+  };
+
+  const handleAvatarFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Reset input so re-selecting same file still triggers onChange
+    event.target.value = "";
+
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    if (!allowed.includes(file.type)) {
+      setFormError("Avatar must be a JPG, PNG, WEBP, or GIF image.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setFormError("Avatar image must be smaller than 5 MB.");
+      return;
+    }
+
+    try {
+      setAvatarUploading(true);
+      setAvatarUploadProgress(0);
+      setFormError(null);
+      const uploaded = await uploadImage(file, (progress) => {
+        setAvatarUploadProgress(progress);
+      });
+      setForm((prev) => ({ ...prev, avatar: uploaded.secureUrl }));
+    } catch {
+      setFormError("Avatar upload failed. Please try again.");
+    } finally {
+      setAvatarUploading(false);
+      setAvatarUploadProgress(0);
+    }
   };
 
   const validateForm = (): string | null => {
@@ -398,11 +437,72 @@ export function ParentChildrenManagePage() {
               onChange={(event) => setForm((prev) => ({ ...prev, age: event.target.value }))}
             />
 
-            <TextField
-              label="Avatar URL (optional)"
-              value={form.avatar}
-              onChange={(event) => setForm((prev) => ({ ...prev, avatar: event.target.value }))}
-            />
+            {/* ── Avatar upload ── */}
+            <Box>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                Avatar (optional)
+              </Typography>
+              <Stack direction="row" alignItems="center" spacing={2}>
+                {/* Preview */}
+                <Avatar
+                  src={form.avatar || undefined}
+                  sx={{ width: 64, height: 64, flexShrink: 0, bgcolor: "action.hover" }}
+                >
+                  {!form.avatar && (
+                    <PhotoCamera sx={{ color: "text.disabled", fontSize: 28 }} />
+                  )}
+                </Avatar>
+
+                <Stack spacing={1} sx={{ flex: 1 }}>
+                  {/* Hidden file input */}
+                  <input
+                    ref={avatarInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    style={{ display: "none" }}
+                    onChange={handleAvatarFileChange}
+                  />
+
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={
+                      avatarUploading ? (
+                        <CircularProgress size={14} color="inherit" />
+                      ) : (
+                        <PhotoCamera />
+                      )
+                    }
+                    onClick={() => avatarInputRef.current?.click()}
+                    disabled={avatarUploading || submitting}
+                    type="button"
+                  >
+                    {avatarUploading
+                      ? `Uploading${avatarUploadProgress > 0 ? ` ${avatarUploadProgress}%` : "…"}`
+                      : form.avatar
+                        ? "Change Photo"
+                        : "Upload Photo"}
+                  </Button>
+
+                  {form.avatar && (
+                    <Tooltip title="Remove avatar">
+                      <Button
+                        size="small"
+                        color="error"
+                        variant="text"
+                        startIcon={<Close />}
+                        onClick={() => setForm((prev) => ({ ...prev, avatar: "" }))}
+                        disabled={avatarUploading || submitting}
+                        type="button"
+                        sx={{ alignSelf: "flex-start" }}
+                      >
+                        Remove
+                      </Button>
+                    </Tooltip>
+                  )}
+                </Stack>
+              </Stack>
+            </Box>
 
             <FormControl fullWidth>
               <InputLabel id="manage-children-age-group">Age Group</InputLabel>
